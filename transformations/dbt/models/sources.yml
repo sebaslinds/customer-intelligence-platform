@@ -1,0 +1,19 @@
+version: 2
+
+sources:
+  - name: raw
+    database: "{{ env_var('SNOWFLAKE_DATABASE') }}"
+    schema: "{{ env_var('SNOWFLAKE_SCHEMA') }}"
+    tables:
+      - name: raw_customers
+        description: Raw customer records loaded by the Python ingestion layer.
+      - name: raw_instacart_orders
+        description: Raw Instacart order records.
+      - name: raw_instacart_order_products_train
+        description: Raw Instacart order-product line items from the training dataset.
+      - name: raw_instacart_products
+        description: Raw Instacart product catalog records.
+      - name: raw_instacart_aisles
+        description: Raw Instacart aisle lookup records.
+      - name: raw_instacart_departments
+        description: Raw Instacart department lookup records.

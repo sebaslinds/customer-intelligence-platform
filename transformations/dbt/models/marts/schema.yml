@@ -1,0 +1,131 @@
+version: 2
+
+models:
+  - name: customer_intelligence
+    description: Curated customer metrics and segmentation for analytics use cases.
+    columns:
+      - name: customer_id
+        description: Unique customer identifier.
+        tests:
+          - not_null
+          - unique
+      - name: customer_segment
+        description: Spend-based customer segment.
+        tests:
+          - not_null
+
+  - name: fct_orders
+    description: Order-level fact table with Instacart order timing and basket metrics.
+    columns:
+      - name: order_id
+        description: Unique order identifier.
+        tests:
+          - unique
+          - not_null
+      - name: user_id
+        description: Customer identifier for the order.
+        tests:
+          - not_null
+
+  - name: dim_products
+    description: Product dimension with aisle, department, and product activity metrics.
+    columns:
+      - name: product_id
+        description: Unique product identifier.
+        tests:
+          - unique
+          - not_null
+      - name: product_name
+        description: Product display name.
+        tests:
+          - not_null
+
+  - name: dim_users
+    description: User dimension with order frequency and reorder behavior metrics.
+    columns:
+      - name: user_id
+        description: Unique customer identifier.
+        tests:
+          - unique
+          - not_null
+
+  - name: feature_store
+    description: User-level feature table for customer intelligence and machine learning workflows.
+    columns:
+      - name: user_id
+        description: Unique customer identifier for feature serving.
+        tests:
+          - unique
+          - not_null
+      - name: total_orders
+        description: Total number of orders placed by the user.
+        tests:
+          - not_null
+      - name: avg_basket_size
+        description: Average number of items per order.
+        tests:
+          - not_null
+      - name: reorder_ratio
+        description: Share of ordered items that were reorders.
+        tests:
+          - not_null
+      - name: unique_products
+        description: Count of distinct products ordered by the user.
+        tests:
+          - not_null
+      - name: days_between_orders
+        description: Average number of days between user orders.
+      - name: will_reorder
+        description: Binary label indicating whether the user has reordered at least one item.
+        tests:
+          - not_null
+
+  - name: customer_cohort_retention
+    description: Cohort retention model based on customer first order number and subsequent order activity.
+    columns:
+      - name: cohort_order_number
+        description: First observed order number for users in the cohort.
+        tests:
+          - not_null
+      - name: cohort_period
+        description: Number of order periods elapsed since the cohort order.
+        tests:
+          - not_null
+      - name: retention_rate
+        description: Share of the cohort active in the period.
+        tests:
+          - not_null
+
+  - name: customer_churn_probability
+    description: SQL-based churn scoring model using order frequency, reorder behavior, and product breadth.
+    columns:
+      - name: user_id
+        description: Unique customer identifier.
+        tests:
+          - unique
+          - not_null
+      - name: churn_probability
+        description: Estimated probability that a customer is at risk of churn.
+        tests:
+          - not_null
+      - name: churn_risk_segment
+        description: Low, medium, or high churn-risk segment.
+        tests:
+          - not_null
+
+  - name: customer_lifetime_value
+    description: Customer lifetime value proxy model based on basket size, frequency, and churn risk.
+    columns:
+      - name: user_id
+        description: Unique customer identifier.
+        tests:
+          - unique
+          - not_null
+      - name: customer_lifetime_value_proxy
+        description: Estimated lifetime value proxy using item count as a revenue proxy.
+        tests:
+          - not_null
+      - name: value_segment
+        description: Customer value segment derived from lifetime value proxy.
+        tests:
+          - not_null

@@ -1,0 +1,45 @@
+version: 2
+
+models:
+  - name: stg_orders
+    description: Cleaned Instacart order header records.
+    columns:
+      - name: order_id
+        description: Unique order identifier.
+        tests:
+          - unique
+          - not_null
+      - name: user_id
+        description: Customer identifier associated with the order.
+        tests:
+          - not_null
+
+  - name: stg_order_products
+    description: Cleaned Instacart order line items.
+    columns:
+      - name: order_product_id
+        description: Unique key for an order-product line item.
+        tests:
+          - unique
+          - not_null
+      - name: order_id
+        description: Order identifier for the line item.
+        tests:
+          - not_null
+      - name: product_id
+        description: Product identifier for the line item.
+        tests:
+          - not_null
+
+  - name: stg_products
+    description: Cleaned Instacart product dimension source with aisle and department names.
+    columns:
+      - name: product_id
+        description: Unique product identifier.
+        tests:
+          - unique
+          - not_null
+      - name: product_name
+        description: Product display name.
+        tests:
+          - not_null
