@@ -115,6 +115,11 @@ TRANSLATIONS = {
         "ai_business_copilot": "AI Business Copilot",
         "ai_copilot_caption": "Ask business questions about churn, reorders, products, retention, and customer behavior.",
         "quick_prompts": "Quick prompts",
+        "copilot_welcome": "Ask business questions about churn, reorders, products, retention, and customer behavior.",
+        "prompt_churn": "Why is churn increasing?",
+        "prompt_products": "What products drive repeat purchases?",
+        "prompt_segments": "Which customer segments are at churn risk?",
+        "prompt_retention": "How can we improve retention?",
         "ask_ai": "Ask for AI insights",
         "generating_insights": "Generating insights from Snowflake metrics...",
         "copilot_api_error": "Unable to reach the copilot API. Check API_BASE_URL and the Render service status.",
@@ -212,6 +217,11 @@ TRANSLATIONS = {
         "ai_business_copilot": "Copilot Business IA",
         "ai_copilot_caption": "Pose des questions business sur le churn, les recommandes, les produits, la retention et les clients.",
         "quick_prompts": "Prompts Rapides",
+        "copilot_welcome": "Pose-moi une question sur le churn, les tendances de recommande, les meilleurs produits, la retention ou les segments clients.",
+        "prompt_churn": "Pourquoi le churn augmente-t-il?",
+        "prompt_products": "Quels produits generent le plus de rachats?",
+        "prompt_segments": "Quels segments clients sont a risque de churn?",
+        "prompt_retention": "Comment pouvons-nous ameliorer la retention?",
         "ask_ai": "Demander des insights IA",
         "generating_insights": "Generation d'insights depuis les metriques Snowflake...",
         "copilot_api_error": "Impossible de joindre l'API copilot. Verifie API_BASE_URL et le statut Render.",
@@ -535,6 +545,24 @@ def get_language() -> str:
 def translate(key: str) -> str:
     language = get_language()
     return TRANSLATIONS.get(language, TRANSLATIONS["en"]).get(key, TRANSLATIONS["en"].get(key, key))
+
+
+def translate_copilot_question(question: str) -> str:
+    if get_language() != "fr":
+        return question
+
+    question_map = {
+        "Why is churn increasing?": translate("prompt_churn"),
+        "What products drive repeat purchases?": translate("prompt_products"),
+        "Which products are most associated with repeat purchases?": translate("prompt_products"),
+        "Which customer segments are at churn risk?": translate("prompt_segments"),
+        "How can we improve retention?": translate("prompt_retention"),
+        "How does retention change by cohort period?": "Comment la retention evolue-t-elle par periode de cohorte?",
+        "Which customer segment has the longest days between orders?": (
+            "Quel segment client a le plus long delai entre les commandes?"
+        ),
+    }
+    return question_map.get(question, question)
 
 
 def toggle_language() -> None:
@@ -992,8 +1020,9 @@ def render_copilot_response(response: dict[str, Any], message_index: int | None 
         for index, follow_up_question in enumerate(follow_up_questions):
             key_parts = ["follow_up", str(message_index if message_index is not None else "live"), str(index)]
             button_key = "_".join(key_parts)
-            if st.button(follow_up_question, key=button_key):
-                queue_copilot_question(follow_up_question)
+            translated_follow_up = translate_copilot_question(follow_up_question)
+            if st.button(translated_follow_up, key=button_key):
+                queue_copilot_question(translated_follow_up)
 
 
 def render_ai_copilot() -> None:
@@ -1004,15 +1033,25 @@ def render_ai_copilot() -> None:
         st.session_state.copilot_messages = [
             {
                 "role": "assistant",
-                "content": translate("ai_copilot_caption"),
+                "content": translate("copilot_welcome"),
             }
         ]
+    elif st.session_state.copilot_messages:
+        first_message = st.session_state.copilot_messages[0]
+        welcome_messages = {
+            TRANSLATIONS["en"]["copilot_welcome"],
+            TRANSLATIONS["fr"]["copilot_welcome"],
+            TRANSLATIONS["en"]["ai_copilot_caption"],
+            TRANSLATIONS["fr"]["ai_copilot_caption"],
+        }
+        if first_message.get("role") == "assistant" and first_message.get("content") in welcome_messages:
+            first_message["content"] = translate("copilot_welcome")
 
     examples = [
-        "Why is churn increasing?",
-        "What products drive repeat purchases?",
-        "Which customer segments are at churn risk?",
-        "How can we improve retention?",
+        translate("prompt_churn"),
+        translate("prompt_products"),
+        translate("prompt_segments"),
+        translate("prompt_retention"),
     ]
     st.markdown(f"**{translate('quick_prompts')}**")
     prompt_columns = st.columns(2)

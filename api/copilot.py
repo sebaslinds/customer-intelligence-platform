@@ -60,17 +60,20 @@ class CopilotResponse(BaseModel):
 
 def classify_question(question: str) -> InsightCategory:
     normalized = question.lower()
-    if any(term in normalized for term in ("churn", "attrition", "drop off", "dropping")):
+    if any(term in normalized for term in ("churn", "attrition", "drop off", "dropping", "desabonnement", "désabonnement")):
         return "churn"
-    if any(term in normalized for term in ("cohort", "retention")):
+    if any(term in normalized for term in ("cohort", "cohorte", "retention", "rétention")):
         return "retention"
-    if any(term in normalized for term in ("lifetime value", "clv", "value segment")):
+    if any(term in normalized for term in ("lifetime value", "clv", "value segment", "valeur vie", "valeur client")):
         return "clv"
-    if any(term in normalized for term in ("top product", "products", "items", "sku")):
+    if any(term in normalized for term in ("top product", "products", "items", "sku", "produit", "produits", "articles")):
         return "top_products"
-    if any(term in normalized for term in ("reorder", "reorders", "repeat")):
+    if any(
+        term in normalized
+        for term in ("reorder", "reorders", "repeat", "recommande", "recommandes", "rachat", "rachats", "repete")
+    ):
         return "reorder_trend"
-    if any(term in normalized for term in ("customer", "user", "basket", "order")):
+    if any(term in normalized for term in ("customer", "user", "basket", "order", "client", "clients", "panier", "commande")):
         return "customer_behavior"
     return "general"
 
@@ -305,7 +308,8 @@ def generate_structured_insights(
                     "intelligence platform. Use only the supplied Snowflake query results. "
                     "If the data is insufficient, say what is missing. Explain metric movements, "
                     "identify impacted customer or product segments, and recommend practical "
-                    "business actions. Keep answers concise and evidence-based. Return only "
+                    "business actions. Keep answers concise and evidence-based. Respond in "
+                    "the same language as the user's question whenever possible. Return only "
                     "valid JSON that matches this schema: "
                     f"{CopilotResponse.model_json_schema()}"
                 ),
