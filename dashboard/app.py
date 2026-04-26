@@ -98,6 +98,134 @@ def load_product_trends() -> pd.DataFrame:
     return query_snowflake(query)
 
 
+def load_data_quality_results() -> pd.DataFrame:
+    query = """
+        with checks as (
+            select
+                'raw_instacart_orders' as table_name,
+                'order_id_not_null' as check_name,
+                count(*) as invalid_count
+            from raw_instacart_orders
+            where order_id is null
+
+            union all
+
+            select
+                'raw_instacart_orders' as table_name,
+                'order_id_unique' as check_name,
+                count(*) as invalid_count
+            from (
+                select order_id
+                from raw_instacart_orders
+                group by order_id
+                having count(*) > 1
+            )
+
+            union all
+
+            select
+                'raw_instacart_products' as table_name,
+                'product_id_not_null' as check_name,
+                count(*) as invalid_count
+            from raw_instacart_products
+            where product_id is null
+
+            union all
+
+            select
+                'raw_instacart_products' as table_name,
+                'product_id_unique' as check_name,
+                count(*) as invalid_count
+            from (
+                select product_id
+                from raw_instacart_products
+                group by product_id
+                having count(*) > 1
+            )
+
+            union all
+
+            select
+                'raw_instacart_order_products_train' as table_name,
+                'order_id_not_null' as check_name,
+                count(*) as invalid_count
+            from raw_instacart_order_products_train
+            where order_id is null
+
+            union all
+
+            select
+                'raw_instacart_order_products_train' as table_name,
+                'product_id_not_null' as check_name,
+                count(*) as invalid_count
+            from raw_instacart_order_products_train
+            where product_id is null
+
+            union all
+
+            select
+                'raw_instacart_order_products_train' as table_name,
+                'order_product_unique' as check_name,
+                count(*) as invalid_count
+            from (
+                select order_id, product_id
+                from raw_instacart_order_products_train
+                group by order_id, product_id
+                having count(*) > 1
+            )
+
+            union all
+
+            select
+                'raw_instacart_order_products_train' as table_name,
+                'product_id_valid' as check_name,
+                count(*) as invalid_count
+            from raw_instacart_order_products_train as order_products
+            left join raw_instacart_products as products
+                on order_products.product_id = products.product_id
+            where order_products.product_id is not null
+                and products.product_id is null
+        )
+
+        select
+            table_name,
+            check_name,
+            invalid_count,
+            case when invalid_count = 0 then 'Passed' else 'Failed' end as status
+        from checks
+        order by table_name, check_name
+    """
+    return query_snowflake(query)
+
+
+def load_raw_table_counts() -> pd.DataFrame:
+    query = """
+        select 'raw_instacart_orders' as table_name, count(*) as row_count
+        from raw_instacart_orders
+
+        union all
+
+        select 'raw_instacart_products' as table_name, count(*) as row_count
+        from raw_instacart_products
+
+        union all
+
+        select 'raw_instacart_order_products_train' as table_name, count(*) as row_count
+        from raw_instacart_order_products_train
+
+        union all
+
+        select 'raw_instacart_aisles' as table_name, count(*) as row_count
+        from raw_instacart_aisles
+
+        union all
+
+        select 'raw_instacart_departments' as table_name, count(*) as row_count
+        from raw_instacart_departments
+    """
+    return query_snowflake(query)
+
+
 @st.cache_data(show_spinner=False)
 def load_model_metrics() -> dict[str, Any]:
     if not MODEL_METRICS_PATH.exists():
@@ -337,6 +465,62 @@ def render_product_trends(frame: pd.DataFrame) -> None:
     )
 
 
+def render_data_quality() -> None:
+    st.subheader("Data Quality")
+    st.caption("Live Snowflake checks for raw Instacart tables before downstream analytics.")
+
+    try:
+        quality_results = load_data_quality_results()
+        raw_counts = load_raw_table_counts()
+    except Exception as exc:
+        logger.exception("Failed to load data quality results")
+        st.error("Unable to load data quality results from Snowflake.")
+        st.exception(exc)
+        return
+
+    if quality_results.empty:
+        st.info("No data quality results found.")
+        return
+
+    total_checks = len(quality_results)
+    passed_checks = int((quality_results["status"] == "Passed").sum())
+    failed_checks = total_checks - passed_checks
+
+    total_column, passed_column, failed_column = st.columns(3)
+    total_column.metric("Total Checks", format_number(total_checks))
+    passed_column.metric("Passed", format_number(passed_checks))
+    failed_column.metric("Failed", format_number(failed_checks))
+
+    status_summary = quality_results["status"].value_counts().rename_axis("status").reset_index(name="checks")
+    st.bar_chart(status_summary.set_index("status")["checks"])
+
+    st.markdown("**Validation Results**")
+    st.dataframe(
+        quality_results,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "table_name": "Table",
+            "check_name": "Check",
+            "invalid_count": st.column_config.NumberColumn("Invalid Rows", format="%d"),
+            "status": "Status",
+        },
+    )
+
+    if not raw_counts.empty:
+        st.markdown("**Raw Table Row Counts**")
+        st.bar_chart(raw_counts.set_index("table_name")["row_count"])
+        st.dataframe(
+            raw_counts,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "table_name": "Table",
+                "row_count": st.column_config.NumberColumn("Rows", format="%d"),
+            },
+        )
+
+
 def render_model_performance(metrics: dict[str, Any], feature_importance: pd.DataFrame) -> None:
     st.subheader("Model Performance")
     if not metrics:
@@ -535,8 +719,15 @@ def main() -> None:
     render_kpis(kpis)
     st.divider()
 
-    overview_tab, customer_tab, product_tab, model_tab, copilot_tab = st.tabs(
-        ["Project Overview", "Customer Insights", "Product Trends", "Model Performance", "AI Copilot"]
+    overview_tab, customer_tab, product_tab, quality_tab, model_tab, copilot_tab = st.tabs(
+        [
+            "Project Overview",
+            "Customer Insights",
+            "Product Trends",
+            "Data Quality",
+            "Model Performance",
+            "AI Copilot",
+        ]
     )
     with overview_tab:
         render_project_overview()
@@ -544,6 +735,8 @@ def main() -> None:
         render_customer_insights(customers)
     with product_tab:
         render_product_trends(products)
+    with quality_tab:
+        render_data_quality()
     with model_tab:
         render_model_performance(model_metrics, feature_importance)
     with copilot_tab:
