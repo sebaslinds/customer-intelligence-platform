@@ -226,6 +226,69 @@ def load_raw_table_counts() -> pd.DataFrame:
     return query_snowflake(query)
 
 
+def load_mart_table_counts() -> pd.DataFrame:
+    query = """
+        select 'fct_orders' as table_name, count(*) as row_count
+        from fct_orders
+
+        union all
+
+        select 'dim_products' as table_name, count(*) as row_count
+        from dim_products
+
+        union all
+
+        select 'dim_users' as table_name, count(*) as row_count
+        from dim_users
+
+        union all
+
+        select 'feature_store' as table_name, count(*) as row_count
+        from feature_store
+
+        union all
+
+        select 'customer_cohort_retention' as table_name, count(*) as row_count
+        from customer_cohort_retention
+
+        union all
+
+        select 'customer_churn_probability' as table_name, count(*) as row_count
+        from customer_churn_probability
+
+        union all
+
+        select 'customer_lifetime_value' as table_name, count(*) as row_count
+        from customer_lifetime_value
+    """
+    return query_snowflake(query)
+
+
+def load_snowflake_connection_health() -> dict[str, Any]:
+    query = """
+        select
+            current_account() as account_name,
+            current_database() as database_name,
+            current_schema() as schema_name,
+            current_warehouse() as warehouse_name,
+            current_role() as role_name
+    """
+    frame = query_snowflake(query)
+    if frame.empty:
+        return {"status": "Failed"}
+
+    health = frame.iloc[0].to_dict()
+    health["status"] = "Connected"
+    return health
+
+
+def load_api_health() -> dict[str, Any]:
+    api_base_url = settings.api_base_url.rstrip("/")
+    response = requests.get(f"{api_base_url}/health", timeout=10)
+    response.raise_for_status()
+    return response.json()
+
+
 @st.cache_data(show_spinner=False)
 def load_model_metrics() -> dict[str, Any]:
     if not MODEL_METRICS_PATH.exists():
@@ -521,6 +584,104 @@ def render_data_quality() -> None:
         )
 
 
+def render_pipeline_health() -> None:
+    st.subheader("Pipeline Health")
+    st.caption("Operational checks across Snowflake, marts, model artifacts, and the deployed API.")
+
+    snowflake_status = "Failed"
+    snowflake_detail: dict[str, Any] = {}
+    try:
+        snowflake_detail = load_snowflake_connection_health()
+        snowflake_status = str(snowflake_detail.get("status", "Connected"))
+    except Exception as exc:
+        logger.exception("Snowflake health check failed")
+        snowflake_detail = {"error": str(exc)}
+
+    api_status = "Failed"
+    api_detail: dict[str, Any] = {}
+    try:
+        api_detail = load_api_health()
+        api_status = "OK" if api_detail.get("status") == "ok" else "Failed"
+    except Exception as exc:
+        logger.exception("API health check failed")
+        api_detail = {"error": str(exc)}
+
+    model_exists = Path(settings.model_path).exists()
+    metrics_exists = MODEL_METRICS_PATH.exists()
+
+    snowflake_column, api_column, model_column, metrics_column = st.columns(4)
+    snowflake_column.metric("Snowflake", snowflake_status)
+    api_column.metric("Render API", api_status)
+    model_column.metric("Model Artifact", "Available" if model_exists else "Missing")
+    metrics_column.metric("Model Metrics", "Available" if metrics_exists else "Missing")
+
+    health_rows = [
+        {
+            "component": "Snowflake connection",
+            "status": snowflake_status,
+            "detail": snowflake_detail.get("database_name") or snowflake_detail.get("error", ""),
+        },
+        {
+            "component": "Render API",
+            "status": api_status,
+            "detail": f"model_loaded={api_detail.get('model_loaded')}" if api_detail else "",
+        },
+        {
+            "component": "Model artifact",
+            "status": "Available" if model_exists else "Missing",
+            "detail": settings.model_path,
+        },
+        {
+            "component": "Training metrics",
+            "status": "Available" if metrics_exists else "Missing",
+            "detail": str(MODEL_METRICS_PATH.relative_to(PROJECT_ROOT)),
+        },
+    ]
+    st.markdown("**Service Checks**")
+    st.dataframe(pd.DataFrame(health_rows), use_container_width=True, hide_index=True)
+
+    if snowflake_status == "Connected":
+        st.markdown("**Snowflake Session**")
+        session_frame = pd.DataFrame([snowflake_detail])
+        st.dataframe(session_frame, use_container_width=True, hide_index=True)
+
+    try:
+        raw_counts = load_raw_table_counts()
+        mart_counts = load_mart_table_counts()
+    except Exception as exc:
+        logger.exception("Failed to load pipeline table counts")
+        st.error("Unable to load pipeline table counts from Snowflake.")
+        st.exception(exc)
+        return
+
+    raw_column, mart_column = st.columns(2)
+    with raw_column:
+        st.markdown("**Raw Tables**")
+        st.bar_chart(raw_counts.set_index("table_name")["row_count"])
+        st.dataframe(
+            raw_counts,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "table_name": "Table",
+                "row_count": st.column_config.NumberColumn("Rows", format="%d"),
+            },
+        )
+
+    with mart_column:
+        st.markdown("**Mart Tables**")
+        st.bar_chart(mart_counts.set_index("table_name")["row_count"])
+        st.dataframe(
+            mart_counts,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "table_name": "Table",
+                "row_count": st.column_config.NumberColumn("Rows", format="%d"),
+            },
+        )
+
+
 def render_model_performance(metrics: dict[str, Any], feature_importance: pd.DataFrame) -> None:
     st.subheader("Model Performance")
     if not metrics:
@@ -719,12 +880,13 @@ def main() -> None:
     render_kpis(kpis)
     st.divider()
 
-    overview_tab, customer_tab, product_tab, quality_tab, model_tab, copilot_tab = st.tabs(
+    overview_tab, customer_tab, product_tab, quality_tab, health_tab, model_tab, copilot_tab = st.tabs(
         [
             "Project Overview",
             "Customer Insights",
             "Product Trends",
             "Data Quality",
+            "Pipeline Health",
             "Model Performance",
             "AI Copilot",
         ]
@@ -737,6 +899,8 @@ def main() -> None:
         render_product_trends(products)
     with quality_tab:
         render_data_quality()
+    with health_tab:
+        render_pipeline_health()
     with model_tab:
         render_model_performance(model_metrics, feature_importance)
     with copilot_tab:
