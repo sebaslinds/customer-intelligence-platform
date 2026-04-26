@@ -2,7 +2,7 @@
 
 An end-to-end data engineering, machine learning, and AI analytics platform built on Instacart-style customer order data.
 
-The platform ingests raw CSV files, models them in Snowflake with dbt, builds customer-level features, trains a reorder prediction model, serves predictions with FastAPI, visualizes insights in Streamlit, and generates business recommendations with an OpenAI-powered copilot.
+The platform ingests raw CSV files, models them in Snowflake with dbt, builds customer-level features, trains a reorder prediction model, serves predictions with FastAPI, visualizes insights in Streamlit, and generates business recommendations with an OpenAI-powered copilot. The dashboard is deployed publicly, supports English/French language switching, and includes interactive business charts and AI insight cards.
 
 ## Live Demo
 
@@ -37,6 +37,11 @@ This project demonstrates how a modern data stack can convert raw transaction da
 - Streamlit dashboard deployed on Streamlit Cloud
 - AI copilot powered by OpenAI and grounded in Snowflake metrics
 - Local fallback mode when OpenAI is unavailable
+- English/French dashboard toggle with localized quick prompts and chat UI
+- Interactive Altair charts with readable axis labels and tooltips
+- AI insight cards for impacted segments, recommendations, priority mix, and follow-up questions
+- Pipeline health tab for Snowflake, Render API, model artifact, and training metric checks
+- Data quality tab for raw table validation and row count monitoring
 - Structured logging, data validation, and CI/CD with GitHub Actions
 - Deployment-ready configuration for Render and Streamlit Cloud
 
@@ -89,7 +94,7 @@ Detailed documentation:
 | Data Processing | pandas, SQLAlchemy |
 | Machine Learning | scikit-learn, joblib |
 | API | FastAPI, Pydantic, Uvicorn |
-| Dashboard | Streamlit |
+| Dashboard | Streamlit, Altair |
 | AI | OpenAI API |
 | Data Quality | Great Expectations-inspired validation checks |
 | Orchestration | Apache Airflow DAG scaffold |
@@ -241,8 +246,20 @@ The Streamlit dashboard includes:
 - KPIs
 - Customer Insights
 - Product Trends
+- Data Quality
+- Pipeline Health
 - Model Performance
 - AI Copilot
+
+Recent dashboard improvements:
+
+- bilingual English/French interface
+- localized copilot quick prompts and chat input
+- revenue proxy explanation, since Instacart does not include product prices
+- larger AI response cards that avoid truncated metric values
+- clearer priority mix explanation for recommendations
+- interactive Altair charts with horizontal or angled x-axis labels
+- health checks for Snowflake, Render API, model artifacts, and model metrics
 
 The AI Copilot tab supports questions such as:
 
@@ -253,6 +270,25 @@ Which customer segment has the longest days between orders?
 How does retention change by cohort period?
 How can we improve retention?
 ```
+
+French examples are also supported:
+
+```text
+Pourquoi le churn augmente-t-il?
+Quels produits generent le plus de rachats?
+Quels segments clients sont a risque de churn?
+Comment pouvons-nous ameliorer la retention?
+```
+
+Copilot responses include:
+
+- AI source indicator, showing whether the answer came from OpenAI or local fallback logic
+- concise summary and business explanation
+- impacted segment cards
+- metric comparison chart
+- recommendation cards
+- priority mix explanation
+- detailed evidence and follow-up questions
 
 ## Local Setup
 
@@ -389,7 +425,7 @@ Configuration:
 ```text
 Main file: dashboard/app.py
 Python version: 3.11
-Dependencies: dashboard/requirements.txt
+Dependencies: requirements.txt
 API_BASE_URL: deployed Render API URL
 ```
 
@@ -429,8 +465,8 @@ Workflow file:
 - Add API authentication and rate limiting
 - Add historical model evaluation tracking
 - Add model drift monitoring
-- Add richer dashboard filters by cohort, product department, and customer segment
+- Add richer dashboard filters by cohort, product department, customer segment, and language-aware insight type
+- Add downloadable AI insight reports
+- Add screenshots or a short demo GIF to the README
 - Deploy Airflow as a managed scheduler
 - Add real-time scoring from Kafka events
-- Add screenshots to the README
-
