@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+import plotly.express as px
 import requests
 import streamlit as st
 from sqlalchemy import text
@@ -614,6 +615,47 @@ def format_percent(value: Any) -> str:
     return f"{float(value):.1%}"
 
 
+def render_bar_chart(
+    frame: pd.DataFrame,
+    x_column: str,
+    y_column: str,
+    *,
+    title: str | None = None,
+    y_title: str | None = None,
+    x_tick_angle: int = -25,
+    height: int = 360,
+) -> None:
+    if frame.empty:
+        return
+
+    chart = px.bar(
+        frame,
+        x=x_column,
+        y=y_column,
+        text_auto=True,
+        title=title,
+        color_discrete_sequence=["#2563eb"],
+    )
+    chart.update_traces(
+        textposition="outside",
+        hovertemplate="<b>%{x}</b><br>%{y}<extra></extra>",
+        marker_line_width=0,
+    )
+    chart.update_layout(
+        height=height,
+        margin={"l": 10, "r": 10, "t": 45 if title else 15, "b": 95},
+        xaxis_title=None,
+        yaxis_title=y_title,
+        showlegend=False,
+        font={"family": "Inter, Segoe UI, sans-serif", "size": 13},
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+    )
+    chart.update_xaxes(tickangle=x_tick_angle, automargin=True)
+    chart.update_yaxes(gridcolor="rgba(148, 163, 184, 0.22)", rangemode="tozero")
+    st.plotly_chart(chart, use_container_width=True, config={"displayModeBar": False})
+
+
 def parse_metric_value(value: Any) -> float | None:
     if value is None or isinstance(value, dict | list | tuple):
         return None
@@ -738,8 +780,15 @@ def render_priority_mix(priority_frame: pd.DataFrame) -> None:
     display_frame["priority_label"] = display_frame["priority"].map(format_priority_label)
     chart_column, context_column = st.columns([1.15, 1])
     with chart_column:
-        st.caption(translate("priority_mix"))
-        st.bar_chart(display_frame.set_index("priority_label")["count"])
+        render_bar_chart(
+            display_frame,
+            "priority_label",
+            "count",
+            title=translate("priority_mix"),
+            y_title=translate("recommendation_count"),
+            x_tick_angle=0,
+            height=320,
+        )
     with context_column:
         st.caption(translate("why_it_matters"))
         st.write(translate("priority_mix_help"))
@@ -833,8 +882,33 @@ def render_customer_insights(frame: pd.DataFrame) -> None:
         st.info(translate("no_customer_data"))
         return
 
-    chart_data = frame.head(15).set_index("user_id")[["total_orders", "unique_products"]]
-    st.bar_chart(chart_data)
+    chart_data = frame.head(15).melt(
+        id_vars="user_id",
+        value_vars=["total_orders", "unique_products"],
+        var_name="metric",
+        value_name="value",
+    )
+    chart = px.bar(
+        chart_data,
+        x="user_id",
+        y="value",
+        color="metric",
+        barmode="group",
+        text_auto=True,
+        color_discrete_sequence=["#2563eb", "#38bdf8"],
+    )
+    chart.update_layout(
+        height=380,
+        margin={"l": 10, "r": 10, "t": 15, "b": 90},
+        xaxis_title=None,
+        yaxis_title=None,
+        legend_title=None,
+        plot_bgcolor="rgba(0,0,0,0)",
+        paper_bgcolor="rgba(0,0,0,0)",
+    )
+    chart.update_xaxes(tickangle=-25, automargin=True)
+    chart.update_yaxes(gridcolor="rgba(148, 163, 184, 0.22)", rangemode="tozero")
+    st.plotly_chart(chart, use_container_width=True, config={"displayModeBar": False})
 
     st.dataframe(
         frame,
@@ -858,8 +932,15 @@ def render_product_trends(frame: pd.DataFrame) -> None:
         st.info(translate("no_product_data"))
         return
 
-    chart_data = frame.head(15).set_index("product_name")["order_line_count"]
-    st.bar_chart(chart_data)
+    chart_data = frame.head(15)[["product_name", "order_line_count"]]
+    render_bar_chart(
+        chart_data,
+        "product_name",
+        "order_line_count",
+        y_title="Order lines",
+        x_tick_angle=-25,
+        height=420,
+    )
 
     st.dataframe(
         frame,
@@ -903,7 +984,7 @@ def render_data_quality() -> None:
     failed_column.metric(translate("failed"), format_number(failed_checks))
 
     status_summary = quality_results["status"].value_counts().rename_axis("status").reset_index(name="checks")
-    st.bar_chart(status_summary.set_index("status")["checks"])
+    render_bar_chart(status_summary, "status", "checks", y_title="Checks", x_tick_angle=0, height=300)
 
     st.markdown(f"**{translate('validation_results')}**")
     st.dataframe(
@@ -920,7 +1001,7 @@ def render_data_quality() -> None:
 
     if not raw_counts.empty:
         st.markdown(f"**{translate('raw_table_row_counts')}**")
-        st.bar_chart(raw_counts.set_index("table_name")["row_count"])
+        render_bar_chart(raw_counts, "table_name", "row_count", y_title="Rows", x_tick_angle=-20, height=360)
         st.dataframe(
             raw_counts,
             use_container_width=True,
@@ -1005,7 +1086,7 @@ def render_pipeline_health() -> None:
     raw_column, mart_column = st.columns(2)
     with raw_column:
         st.markdown(f"**{translate('raw_tables')}**")
-        st.bar_chart(raw_counts.set_index("table_name")["row_count"])
+        render_bar_chart(raw_counts, "table_name", "row_count", y_title="Rows", x_tick_angle=-20, height=340)
         st.dataframe(
             raw_counts,
             use_container_width=True,
@@ -1018,7 +1099,7 @@ def render_pipeline_health() -> None:
 
     with mart_column:
         st.markdown(f"**{translate('mart_tables')}**")
-        st.bar_chart(mart_counts.set_index("table_name")["row_count"])
+        render_bar_chart(mart_counts, "table_name", "row_count", y_title="Rows", x_tick_angle=-20, height=340)
         st.dataframe(
             mart_counts,
             use_container_width=True,
@@ -1062,8 +1143,8 @@ def render_model_performance(metrics: dict[str, Any], feature_importance: pd.Dat
 
     if not feature_importance.empty:
         st.subheader(translate("feature_importance"))
-        chart_data = feature_importance.set_index("feature")["importance"]
-        st.bar_chart(chart_data)
+        chart_data = feature_importance[["feature", "importance"]]
+        render_bar_chart(chart_data, "feature", "importance", y_title="Importance", x_tick_angle=-20, height=360)
         st.dataframe(
             feature_importance,
             use_container_width=True,
@@ -1098,8 +1179,15 @@ def render_copilot_response(response: dict[str, Any], message_index: int | None 
 
         chart_frame = build_segments_chart_frame(impacted_segments)
         if not chart_frame.empty:
-            st.caption(translate("metric_comparison"))
-            st.bar_chart(chart_frame.set_index("segment")["value"])
+            render_bar_chart(
+                chart_frame,
+                "segment",
+                "value",
+                title=translate("metric_comparison"),
+                y_title="Value",
+                x_tick_angle=-20,
+                height=430,
+            )
 
         with st.expander(translate("supporting_table")):
             st.dataframe(segment_frame, use_container_width=True, hide_index=True)
