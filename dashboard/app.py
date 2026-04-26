@@ -1,3 +1,4 @@
+import json
 import logging
 import sys
 from pathlib import Path
@@ -20,6 +21,9 @@ settings = get_settings()
 validate_production_settings(settings)
 configure_logging(settings.log_level)
 logger = logging.getLogger(__name__)
+
+MODEL_METRICS_PATH = PROJECT_ROOT / "ml" / "artifacts" / "training_metrics.json"
+FEATURE_IMPORTANCE_PATH = PROJECT_ROOT / "ml" / "artifacts" / "feature_importance.csv"
 
 
 st.set_page_config(
@@ -87,6 +91,23 @@ def load_product_trends() -> pd.DataFrame:
         limit 25
     """
     return query_snowflake(query)
+
+
+@st.cache_data(show_spinner=False)
+def load_model_metrics() -> dict[str, Any]:
+    if not MODEL_METRICS_PATH.exists():
+        return {}
+
+    with MODEL_METRICS_PATH.open("r", encoding="utf-8") as file:
+        return json.load(file)
+
+
+@st.cache_data(show_spinner=False)
+def load_feature_importance() -> pd.DataFrame:
+    if not FEATURE_IMPORTANCE_PATH.exists():
+        return pd.DataFrame(columns=["feature", "importance"])
+
+    return pd.read_csv(FEATURE_IMPORTANCE_PATH)
 
 
 def format_number(value: Any) -> str:
@@ -163,6 +184,56 @@ def render_product_trends(frame: pd.DataFrame) -> None:
     )
 
 
+def render_model_performance(metrics: dict[str, Any], feature_importance: pd.DataFrame) -> None:
+    st.subheader("Model Performance")
+    if not metrics:
+        st.info("No model metrics found. Run the ML training pipeline first.")
+        return
+
+    accuracy, precision, recall, f1_score, roc_auc = st.columns(5)
+    accuracy.metric("Accuracy", format_percent(metrics.get("accuracy", 0)))
+    precision.metric("Precision", format_percent(metrics.get("precision", 0)))
+    recall.metric("Recall", format_percent(metrics.get("recall", 0)))
+    f1_score.metric("F1 Score", format_percent(metrics.get("f1", 0)))
+    roc_auc.metric("ROC AUC", f"{float(metrics.get('roc_auc') or 0):.3f}")
+
+    train_rows, test_rows, positive_rate = st.columns(3)
+    train_rows.metric("Train Rows", format_number(metrics.get("train_rows", 0)))
+    test_rows.metric("Test Rows", format_number(metrics.get("test_rows", 0)))
+    positive_rate.metric("Positive Rate", format_percent(metrics.get("positive_rate", 0)))
+
+    st.divider()
+
+    confusion_matrix = metrics.get("confusion_matrix", [])
+    if confusion_matrix:
+        confusion_frame = pd.DataFrame(
+            confusion_matrix,
+            index=["Actual No Reorder", "Actual Reorder"],
+            columns=["Predicted No Reorder", "Predicted Reorder"],
+        )
+        st.subheader("Confusion Matrix")
+        st.dataframe(confusion_frame, use_container_width=True)
+
+    if not feature_importance.empty:
+        st.subheader("Feature Importance")
+        chart_data = feature_importance.set_index("feature")["importance"]
+        st.bar_chart(chart_data)
+        st.dataframe(
+            feature_importance,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "feature": "Feature",
+                "importance": st.column_config.ProgressColumn(
+                    "Importance",
+                    format="%.3f",
+                    min_value=0,
+                    max_value=1,
+                ),
+            },
+        )
+
+
 def render_sidebar() -> None:
     st.sidebar.header("Controls")
     st.sidebar.write(f"Environment: `{settings.app_env}`")
@@ -181,6 +252,8 @@ def main() -> None:
         kpis = load_kpis()
         customers = load_customer_insights()
         products = load_product_trends()
+        model_metrics = load_model_metrics()
+        feature_importance = load_feature_importance()
     except Exception as exc:
         logger.exception("Failed to load dashboard data")
         st.error("Unable to load dashboard data from Snowflake.")
@@ -190,11 +263,13 @@ def main() -> None:
     render_kpis(kpis)
     st.divider()
 
-    customer_tab, product_tab = st.tabs(["Customer Insights", "Product Trends"])
+    customer_tab, product_tab, model_tab = st.tabs(["Customer Insights", "Product Trends", "Model Performance"])
     with customer_tab:
         render_customer_insights(customers)
     with product_tab:
         render_product_trends(products)
+    with model_tab:
+        render_model_performance(model_metrics, feature_importance)
 
 
 if __name__ == "__main__":
