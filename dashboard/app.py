@@ -132,6 +132,15 @@ TRANSLATIONS = {
         "supporting_table": "Supporting table",
         "recommendations": "Recommendations",
         "priority_mix": "Recommendation priority mix",
+        "priority_mix_help": (
+            "This chart counts recommendations by urgency. High means act first, medium means plan next, "
+            "and low means monitor or improve later."
+        ),
+        "priority_level": "Priority level",
+        "recommendation_count": "Recommendations",
+        "priority_high_meaning": "Immediate action: highest expected business impact or risk reduction.",
+        "priority_medium_meaning": "Near-term action: useful improvement after the urgent items are handled.",
+        "priority_low_meaning": "Monitor or backlog: lower urgency but still useful for optimization.",
         "detailed_insights": "Detailed Insights",
         "evidence": "Evidence",
         "follow_up_questions": "Follow-up questions",
@@ -237,6 +246,15 @@ TRANSLATIONS = {
         "supporting_table": "Table de support",
         "recommendations": "Recommandations",
         "priority_mix": "Mix Des Priorites",
+        "priority_mix_help": (
+            "Ce graphique compte les recommandations par niveau d'urgence. Eleve signifie a traiter en "
+            "premier, moyen signifie a planifier ensuite, et faible signifie a surveiller ou optimiser plus tard."
+        ),
+        "priority_level": "Niveau de priorite",
+        "recommendation_count": "Recommandations",
+        "priority_high_meaning": "Action immediate: impact business ou reduction du risque la plus forte.",
+        "priority_medium_meaning": "Action court terme: amelioration utile apres les points urgents.",
+        "priority_low_meaning": "Suivi ou backlog: moins urgent, mais utile pour optimiser.",
         "detailed_insights": "Insights détaillés",
         "evidence": "Evidence",
         "follow_up_questions": "Questions de suivi",
@@ -645,6 +663,25 @@ def build_recommendation_priority_frame(recommendations: list[dict[str, Any]]) -
     return priority_frame.sort_values("sort_order", ascending=False).drop(columns="sort_order")
 
 
+def build_priority_explanation_frame(priority_frame: pd.DataFrame) -> pd.DataFrame:
+    meanings = {
+        "high": translate("priority_high_meaning"),
+        "medium": translate("priority_medium_meaning"),
+        "low": translate("priority_low_meaning"),
+    }
+    rows = []
+    for priority in ("high", "medium", "low"):
+        matching_rows = priority_frame.loc[priority_frame["priority"] == priority, "count"]
+        rows.append(
+            {
+                translate("priority_level"): format_priority_label(priority),
+                translate("recommendation_count"): int(matching_rows.iloc[0]) if not matching_rows.empty else 0,
+                translate("why_it_matters"): meanings[priority],
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 def format_segment_metric_value(segment: dict[str, Any]) -> str:
     value = str(segment.get("value") or "0")
     metric = str(segment.get("metric") or "")
@@ -683,6 +720,26 @@ def render_recommendation_cards(recommendations: list[dict[str, Any]]) -> None:
                 st.markdown(f"**{recommendation.get('action', '')}**")
                 if expected_impact := recommendation.get("expected_impact"):
                     st.write(expected_impact)
+
+
+def render_priority_mix(priority_frame: pd.DataFrame) -> None:
+    if priority_frame.empty:
+        return
+
+    display_frame = priority_frame.copy()
+    display_frame["priority_label"] = display_frame["priority"].map(format_priority_label)
+    chart_column, context_column = st.columns([1.15, 1])
+    with chart_column:
+        st.caption(translate("priority_mix"))
+        st.bar_chart(display_frame.set_index("priority_label")["count"])
+    with context_column:
+        st.caption(translate("why_it_matters"))
+        st.write(translate("priority_mix_help"))
+        st.dataframe(
+            build_priority_explanation_frame(priority_frame),
+            use_container_width=True,
+            hide_index=True,
+        )
 
 
 def render_ai_source(response: dict[str, Any]) -> None:
@@ -1045,8 +1102,7 @@ def render_copilot_response(response: dict[str, Any], message_index: int | None 
 
         priority_frame = build_recommendation_priority_frame(recommendations)
         if not priority_frame.empty:
-            st.caption(translate("priority_mix"))
-            st.bar_chart(priority_frame.set_index("priority")["count"])
+            render_priority_mix(priority_frame)
 
     insights = response.get("insights") or []
     if insights:
