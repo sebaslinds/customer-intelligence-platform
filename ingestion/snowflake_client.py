@@ -22,4 +22,8 @@ def build_snowflake_engine(settings: Settings) -> Engine:
         f"@{settings.snowflake_account}/{settings.snowflake_database}/{settings.snowflake_schema}"
         f"?warehouse={settings.snowflake_warehouse}{role}"
     )
-    return create_engine(url)
+    connect_args = {}
+    if settings.snowflake_insecure_mode:
+        connect_args["insecure_mode"] = True
+
+    return create_engine(url, connect_args=connect_args)

@@ -15,17 +15,19 @@ class Settings(BaseSettings):
     snowflake_warehouse: str | None = None
     snowflake_database: str | None = None
     snowflake_schema: str | None = None
+    snowflake_insecure_mode: bool = False
 
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     model_path: str = "ml/artifacts/random_forest_reorder_model.joblib"
+    openai_api_key: str | None = None
     openai_model: str = "gpt-4.1-mini"
     kafka_bootstrap_servers: str = "localhost:9092"
     kafka_topic: str = "instacart.orders"
     kafka_consumer_group: str = "customer-intelligence-streaming"
     kafka_batch_size: int = 100
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 
 @lru_cache

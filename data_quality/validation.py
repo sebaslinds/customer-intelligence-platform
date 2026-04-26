@@ -1,7 +1,6 @@
 import logging
 from dataclasses import dataclass
 
-from great_expectations.dataset import SqlAlchemyDataset
 from sqlalchemy import text
 
 from config.logging_config import configure_logging
@@ -22,22 +21,11 @@ class ValidationResult:
     unexpected_count: int | None = None
 
 
-def build_dataset(table_name: str) -> SqlAlchemyDataset:
-    settings = get_settings()
-    engine = build_snowflake_engine(settings)
-    return SqlAlchemyDataset(table_name=table_name, engine=engine)
-
-
-def extract_unexpected_count(result: dict) -> int | None:
-    result_payload = result.get("result", {})
-    return result_payload.get("unexpected_count")
-
-
-def run_expectation(check_name: str, result: dict) -> ValidationResult:
+def run_count_check(check_name: str, invalid_count: int) -> ValidationResult:
     validation_result = ValidationResult(
         check_name=check_name,
-        success=bool(result.get("success")),
-        unexpected_count=extract_unexpected_count(result),
+        success=invalid_count == 0,
+        unexpected_count=invalid_count,
     )
 
     if validation_result.success:
@@ -52,44 +40,41 @@ def run_expectation(check_name: str, result: dict) -> ValidationResult:
     return validation_result
 
 
+def fetch_invalid_count(query: str) -> int:
+    settings = get_settings()
+    engine = build_snowflake_engine(settings)
+    try:
+        with engine.begin() as connection:
+            return int(connection.execute(text(query)).scalar_one())
+    finally:
+        engine.dispose()
+
+
 def validate_orders() -> list[ValidationResult]:
-    orders = build_dataset(ORDERS_TABLE)
     return [
-        run_expectation(
+        run_count_check(
             "orders.order_id_not_null",
-            orders.expect_column_values_to_not_be_null("order_id"),
+            fetch_invalid_count(f"select count(*) from {ORDERS_TABLE} where order_id is null"),
         ),
-        run_expectation(
+        run_count_check(
             "orders.order_id_unique",
-            orders.expect_column_values_to_be_unique("order_id"),
+            fetch_invalid_count(
+                f"""
+                select count(*)
+                from (
+                    select order_id
+                    from {ORDERS_TABLE}
+                    group by order_id
+                    having count(*) > 1
+                )
+                """
+            ),
         ),
     ]
-
-
-def validate_order_products() -> list[ValidationResult]:
-    order_products = build_dataset(ORDER_PRODUCTS_TABLE)
-    results = [
-        run_expectation(
-            "order_products.order_id_not_null",
-            order_products.expect_column_values_to_not_be_null("order_id"),
-        ),
-        run_expectation(
-            "order_products.product_id_not_null",
-            order_products.expect_column_values_to_not_be_null("product_id"),
-        ),
-        run_expectation(
-            "order_products.order_product_unique",
-            order_products.expect_compound_columns_to_be_unique(["order_id", "product_id"]),
-        ),
-    ]
-    results.append(validate_product_id_references())
-    return results
 
 
 def validate_product_id_references() -> ValidationResult:
-    settings = get_settings()
-    engine = build_snowflake_engine(settings)
-    query = text(
+    invalid_count = fetch_invalid_count(
         f"""
         select count(*) as invalid_product_id_count
         from {ORDER_PRODUCTS_TABLE} as order_products
@@ -99,39 +84,56 @@ def validate_product_id_references() -> ValidationResult:
             and products.product_id is null
         """
     )
+    return run_count_check("order_products.product_id_valid", invalid_count)
 
-    try:
-        with engine.begin() as connection:
-            invalid_count = connection.execute(query).scalar_one()
-    finally:
-        engine.dispose()
 
-    result = ValidationResult(
-        check_name="order_products.product_id_valid",
-        success=invalid_count == 0,
-        unexpected_count=int(invalid_count),
-    )
-    if result.success:
-        logger.info("Validation passed: %s", result.check_name)
-    else:
-        logger.error(
-            "Validation failed: %s unexpected_count=%s",
-            result.check_name,
-            result.unexpected_count,
-        )
-    return result
+def validate_order_products() -> list[ValidationResult]:
+    return [
+        run_count_check(
+            "order_products.order_id_not_null",
+            fetch_invalid_count(f"select count(*) from {ORDER_PRODUCTS_TABLE} where order_id is null"),
+        ),
+        run_count_check(
+            "order_products.product_id_not_null",
+            fetch_invalid_count(f"select count(*) from {ORDER_PRODUCTS_TABLE} where product_id is null"),
+        ),
+        run_count_check(
+            "order_products.order_product_unique",
+            fetch_invalid_count(
+                f"""
+                select count(*)
+                from (
+                    select order_id, product_id
+                    from {ORDER_PRODUCTS_TABLE}
+                    group by order_id, product_id
+                    having count(*) > 1
+                )
+                """
+            ),
+        ),
+        validate_product_id_references(),
+    ]
 
 
 def validate_products() -> list[ValidationResult]:
-    products = build_dataset(PRODUCTS_TABLE)
     return [
-        run_expectation(
+        run_count_check(
             "products.product_id_not_null",
-            products.expect_column_values_to_not_be_null("product_id"),
+            fetch_invalid_count(f"select count(*) from {PRODUCTS_TABLE} where product_id is null"),
         ),
-        run_expectation(
+        run_count_check(
             "products.product_id_unique",
-            products.expect_column_values_to_be_unique("product_id"),
+            fetch_invalid_count(
+                f"""
+                select count(*)
+                from (
+                    select product_id
+                    from {PRODUCTS_TABLE}
+                    group by product_id
+                    having count(*) > 1
+                )
+                """
+            ),
         ),
     ]
 

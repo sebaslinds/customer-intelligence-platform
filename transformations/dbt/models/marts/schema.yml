@@ -1,19 +1,6 @@
 version: 2
 
 models:
-  - name: customer_intelligence
-    description: Curated customer metrics and segmentation for analytics use cases.
-    columns:
-      - name: customer_id
-        description: Unique customer identifier.
-        tests:
-          - not_null
-          - unique
-      - name: customer_segment
-        description: Spend-based customer segment.
-        tests:
-          - not_null
-
   - name: fct_orders
     description: Order-level fact table with Instacart order timing and basket metrics.
     columns:

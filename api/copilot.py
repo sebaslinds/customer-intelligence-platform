@@ -1,9 +1,10 @@
+import json
 import logging
 from typing import Any, Literal
 
 import pandas as pd
 from fastapi import APIRouter, HTTPException, status
-from openai import OpenAI
+from openai import OpenAI, OpenAIError
 from pydantic import BaseModel, Field
 from sqlalchemy import Engine, text
 
@@ -236,12 +237,16 @@ def generate_structured_insights(
     model: str | None = None,
 ) -> CopilotResponse:
     settings = get_settings()
-    client = OpenAI()
+    if not settings.openai_api_key:
+        raise ValueError("OPENAI_API_KEY is required to generate copilot insights.")
+
+    client = OpenAI(api_key=settings.openai_api_key)
     selected_model = model or settings.openai_model
 
-    response = client.responses.parse(
+    response = client.chat.completions.create(
         model=selected_model,
-        input=[
+        response_format={"type": "json_object"},
+        messages=[
             {
                 "role": "system",
                 "content": (
@@ -249,7 +254,9 @@ def generate_structured_insights(
                     "intelligence platform. Use only the supplied Snowflake query results. "
                     "If the data is insufficient, say what is missing. Explain metric movements, "
                     "identify impacted customer or product segments, and recommend practical "
-                    "business actions. Keep answers concise and evidence-based."
+                    "business actions. Keep answers concise and evidence-based. Return only "
+                    "valid JSON that matches this schema: "
+                    f"{CopilotResponse.model_json_schema()}"
                 ),
             },
             {
@@ -257,12 +264,106 @@ def generate_structured_insights(
                 "content": f"Question: {question}\n\nSnowflake context:\n{context}",
             },
         ],
-        text_format=CopilotResponse,
     )
 
-    parsed = response.output_parsed
+    content = response.choices[0].message.content
+    if not content:
+        raise ValueError("OpenAI returned an empty copilot response.")
+
+    parsed = CopilotResponse.model_validate(json.loads(content))
     parsed.question = question
     return parsed
+
+
+def get_metric(record: dict[str, Any], key: str, default: float = 0.0) -> float:
+    value = record.get(key, default)
+    if value is None:
+        return default
+    return float(value)
+
+
+def generate_local_insights(question: str, context: dict[str, Any]) -> CopilotResponse:
+    churn_segments = context.get("churn_by_segment", [])
+    high_churn = next(
+        (segment for segment in churn_segments if segment.get("churn_risk_segment") == "high"),
+        churn_segments[0] if churn_segments else {},
+    )
+    customer_behavior = (context.get("customer_behavior") or [{}])[0]
+    retention_rows = context.get("cohort_retention", [])
+
+    high_churn_probability = get_metric(high_churn, "avg_churn_probability")
+    high_churn_users = int(get_metric(high_churn, "users"))
+    avg_reorder_ratio = get_metric(customer_behavior, "avg_reorder_ratio")
+    avg_days_between_orders = get_metric(customer_behavior, "avg_days_between_orders")
+
+    latest_retention = retention_rows[0] if retention_rows else {}
+    latest_retention_rate = get_metric(latest_retention, "retention_rate")
+
+    explanation = (
+        "Local fallback analysis suggests churn risk is concentrated among customers with weaker "
+        "reorder behavior, fewer total orders, and longer gaps between purchases. "
+        "OpenAI generation was unavailable, so this response was generated directly from Snowflake metrics."
+    )
+
+    return CopilotResponse(
+        question=question,
+        summary="Churn appears tied to lower reorder engagement and longer purchase intervals.",
+        explanation=explanation,
+        impacted_segments=[
+            ImpactedSegment(
+                segment_name=str(high_churn.get("churn_risk_segment", "high")),
+                metric="avg_churn_probability",
+                value=f"{high_churn_probability:.2%}",
+                why_it_matters="This segment has the highest modeled churn risk and should be prioritized for retention actions.",
+            ),
+            ImpactedSegment(
+                segment_name="overall_customer_base",
+                metric="avg_days_between_orders",
+                value=f"{avg_days_between_orders:.2f}",
+                why_it_matters="Longer order gaps can indicate declining purchase intent.",
+            ),
+        ],
+        recommendations=[
+            Recommendation(
+                action="Launch a targeted reorder campaign for high-risk customers.",
+                expected_impact="Increase repeat purchase behavior among customers most likely to churn.",
+                priority="high",
+            ),
+            Recommendation(
+                action="Promote frequently reordered products in personalized offers.",
+                expected_impact="Improve basket relevance and encourage faster next orders.",
+                priority="medium",
+            ),
+            Recommendation(
+                action="Monitor cohort retention and reorder ratio weekly.",
+                expected_impact="Detect churn movement earlier and adjust campaigns faster.",
+                priority="medium",
+            ),
+        ],
+        insights=[
+            Insight(
+                title="High-risk customers need retention focus",
+                category="churn",
+                finding=f"The highest-risk segment contains {high_churn_users} users with average churn probability of {high_churn_probability:.2%}.",
+                evidence=[
+                    f"Average reorder ratio: {avg_reorder_ratio:.2%}",
+                    f"Latest cohort retention rate: {latest_retention_rate:.2%}",
+                ],
+                impact="high",
+                recommended_action="Prioritize retention campaigns for users with low reorder ratios and long order gaps.",
+            )
+        ],
+        follow_up_questions=[
+            "Which products are most associated with repeat purchases?",
+            "Which customer segment has the longest days between orders?",
+            "How does retention change by cohort period?",
+        ],
+        data_sources=[
+            "customer_churn_probability",
+            "feature_store",
+            "customer_cohort_retention",
+        ],
+    )
 
 
 def answer_business_question(question: str) -> CopilotResponse:
@@ -272,7 +373,11 @@ def answer_business_question(question: str) -> CopilotResponse:
 
     try:
         context = collect_business_context(engine, category)
-        return generate_structured_insights(question=question, context=context)
+        try:
+            return generate_structured_insights(question=question, context=context)
+        except (OpenAIError, ValueError, json.JSONDecodeError) as error:
+            logger.warning("OpenAI copilot unavailable; using local metric fallback: %s", error)
+            return generate_local_insights(question=question, context=context)
     except Exception:
         logger.exception("Copilot insight generation failed")
         raise

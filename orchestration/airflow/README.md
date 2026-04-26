@@ -31,3 +31,9 @@ Daily task order:
 ## Local Airflow Placement
 
 Copy or symlink `orchestration/airflow/dags/customer_intelligence_pipeline.py` into your Airflow `dags/` directory, then set `PROJECT_ROOT` to the repository path.
+
+Install Airflow in a separate environment because Airflow 2.10 requires `SQLAlchemy<2.0`, while the application stack uses SQLAlchemy 2.x:
+
+```bash
+pip install -r requirements-airflow.txt
+```
