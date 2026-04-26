@@ -205,6 +205,8 @@ def render_ai_source(response: dict[str, Any]) -> None:
     }.get(str(ai_source), str(ai_source).replace("_", " ").title())
 
     st.caption(f"AI Source: {source_label}")
+    if source_detail := response.get("ai_source_detail"):
+        st.caption(str(source_detail))
 
 
 def render_header() -> None:
