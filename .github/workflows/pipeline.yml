@@ -21,6 +21,13 @@ jobs:
       APP_ENV: ci
       LOG_LEVEL: INFO
       PYTHONPATH: ${{ github.workspace }}
+      SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+      SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
+      SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
+      SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
+      SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
+      SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
+      SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
 
     steps:
       - name: Checkout repository
@@ -47,34 +54,27 @@ jobs:
 
       - name: Run dbt tests
         if: >-
-          ${{ secrets.SNOWFLAKE_ACCOUNT != '' &&
-              secrets.SNOWFLAKE_USER != '' &&
-              secrets.SNOWFLAKE_PASSWORD != '' &&
-              secrets.SNOWFLAKE_WAREHOUSE != '' &&
-              secrets.SNOWFLAKE_DATABASE != '' &&
-              secrets.SNOWFLAKE_SCHEMA != '' }}
+          ${{ env.SNOWFLAKE_ACCOUNT != '' &&
+              env.SNOWFLAKE_USER != '' &&
+              env.SNOWFLAKE_PASSWORD != '' &&
+              env.SNOWFLAKE_WAREHOUSE != '' &&
+              env.SNOWFLAKE_DATABASE != '' &&
+              env.SNOWFLAKE_SCHEMA != '' }}
         working-directory: transformations/dbt
-        env:
-          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: ${{ secrets.SNOWFLAKE_USER }}
-          SNOWFLAKE_PASSWORD: ${{ secrets.SNOWFLAKE_PASSWORD }}
-          SNOWFLAKE_ROLE: ${{ secrets.SNOWFLAKE_ROLE }}
-          SNOWFLAKE_WAREHOUSE: ${{ secrets.SNOWFLAKE_WAREHOUSE }}
-          SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
-          SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
         run: |
           cp profiles.yml.example profiles.yml
           dbt deps --profiles-dir .
+          dbt run --profiles-dir .
           dbt test --profiles-dir .
 
       - name: Skip dbt tests
         if: >-
-          ${{ secrets.SNOWFLAKE_ACCOUNT == '' ||
-              secrets.SNOWFLAKE_USER == '' ||
-              secrets.SNOWFLAKE_PASSWORD == '' ||
-              secrets.SNOWFLAKE_WAREHOUSE == '' ||
-              secrets.SNOWFLAKE_DATABASE == '' ||
-              secrets.SNOWFLAKE_SCHEMA == '' }}
+          ${{ env.SNOWFLAKE_ACCOUNT == '' ||
+              env.SNOWFLAKE_USER == '' ||
+              env.SNOWFLAKE_PASSWORD == '' ||
+              env.SNOWFLAKE_WAREHOUSE == '' ||
+              env.SNOWFLAKE_DATABASE == '' ||
+              env.SNOWFLAKE_SCHEMA == '' }}
         run: |
           echo "Skipping dbt tests because Snowflake secrets are not configured."
 
@@ -82,9 +82,12 @@ jobs:
     name: Deploy API to Render
     runs-on: ubuntu-latest
     needs: ci
-    if: ${{ github.ref == 'refs/heads/main' && secrets.RENDER_DEPLOY_HOOK_URL != '' }}
+    if: ${{ github.ref == 'refs/heads/main' }}
 
     steps:
       - name: Trigger Render deploy hook
+        if: ${{ env.RENDER_DEPLOY_HOOK_URL != '' }}
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
         run: |
-          curl --fail --request POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+          curl --fail --request POST "${RENDER_DEPLOY_HOOK_URL}"
