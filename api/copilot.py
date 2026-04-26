@@ -114,7 +114,7 @@ def get_top_products_context(engine: Engine) -> dict[str, Any]:
 
 
 def get_customer_behavior_context(engine: Engine) -> dict[str, Any]:
-    query = """
+    summary_query = """
         select
             count(*) as total_users,
             avg(total_orders) as avg_total_orders,
@@ -124,7 +124,55 @@ def get_customer_behavior_context(engine: Engine) -> dict[str, Any]:
             avg(days_between_orders) as avg_days_between_orders
         from feature_store
     """
-    return {"customer_behavior": run_query(engine, query)}
+    segment_query = """
+        with segmented as (
+            select
+                case
+                    when total_orders >= 80 then 'power_customers_80_plus_orders'
+                    when total_orders >= 40 then 'frequent_customers_40_to_79_orders'
+                    when total_orders >= 10 then 'developing_customers_10_to_39_orders'
+                    else 'low_frequency_customers_under_10_orders'
+                end as customer_segment,
+                user_id,
+                total_orders,
+                avg_basket_size,
+                reorder_ratio,
+                unique_products,
+                days_between_orders
+            from feature_store
+        )
+
+        select
+            customer_segment,
+            count(*) as users,
+            avg(total_orders) as avg_total_orders,
+            avg(avg_basket_size) as avg_basket_size,
+            avg(reorder_ratio) as avg_reorder_ratio,
+            avg(unique_products) as avg_unique_products,
+            avg(days_between_orders) as avg_days_between_orders,
+            max(days_between_orders) as max_days_between_orders
+        from segmented
+        group by customer_segment
+        order by avg_days_between_orders desc
+    """
+    longest_gap_query = """
+        select
+            user_id,
+            total_orders,
+            observed_basket_orders,
+            avg_basket_size,
+            reorder_ratio,
+            unique_products,
+            days_between_orders
+        from feature_store
+        order by days_between_orders desc
+        limit 20
+    """
+    return {
+        "customer_behavior": run_query(engine, summary_query),
+        "customer_segments": run_query(engine, segment_query),
+        "customers_with_longest_order_gaps": run_query(engine, longest_gap_query),
+    }
 
 
 def get_churn_context(engine: Engine) -> dict[str, Any]:
@@ -577,60 +625,76 @@ def generate_reorder_fallback(question: str, context: dict[str, Any]) -> Copilot
 
 def generate_customer_behavior_fallback(question: str, context: dict[str, Any]) -> CopilotResponse:
     customer_behavior = (context.get("customer_behavior") or [{}])[0]
+    customer_segments = context.get("customer_segments") or []
     total_users = int(get_metric(customer_behavior, "total_users"))
     avg_total_orders = get_metric(customer_behavior, "avg_total_orders")
     avg_days_between_orders = get_metric(customer_behavior, "avg_days_between_orders")
     avg_reorder_ratio = get_metric(customer_behavior, "avg_reorder_ratio")
+    longest_gap_segment = (
+        max(customer_segments, key=lambda segment: get_metric(segment, "avg_days_between_orders"))
+        if customer_segments
+        else {}
+    )
+    segment_name = str(longest_gap_segment.get("customer_segment", "overall_customer_base"))
+    segment_avg_gap = get_metric(longest_gap_segment, "avg_days_between_orders", avg_days_between_orders)
+    segment_users = int(get_metric(longest_gap_segment, "users", total_users))
 
     return CopilotResponse(
         question=question,
-        summary="Customer behavior is driven by order frequency, reorder ratio, and purchase interval length.",
-        explanation="This fallback response summarizes the aggregate feature store to explain broad customer behavior.",
+        summary=f"{segment_name} has the longest average days between orders at {format_metric_number(segment_avg_gap)} days.",
+        explanation=(
+            "This fallback response segments customers by total order frequency, then compares average days "
+            "between orders across those segments. This directly answers which segment has the longest purchase interval."
+        ),
         impacted_segments=[
             ImpactedSegment(
-                segment_name="overall_customer_base",
-                metric="total_users",
-                value=format_metric_number(total_users),
-                why_it_matters="This is the active modeled customer population in the feature store.",
+                segment_name=segment_name,
+                metric="avg_days_between_orders",
+                value=format_metric_number(segment_avg_gap),
+                why_it_matters="This segment waits the longest between orders, making it a priority for lifecycle nudges.",
             ),
             ImpactedSegment(
                 segment_name="overall_customer_base",
                 metric="avg_days_between_orders",
                 value=format_metric_number(avg_days_between_orders),
-                why_it_matters="Order gaps are a key indicator of customer engagement and churn risk.",
+                why_it_matters="This is the baseline used to compare the longest-gap segment.",
             ),
         ],
         recommendations=[
             Recommendation(
-                action="Segment customers by order frequency and days between orders.",
-                expected_impact="Create clearer retention groups for campaign targeting.",
+                action=f"Create a reactivation campaign for {segment_name}.",
+                expected_impact="Reduce the longest purchase gaps and move customers toward more frequent repeat orders.",
                 priority="high",
             ),
             Recommendation(
-                action="Use reorder ratio to identify customers ready for personalized refill prompts.",
-                expected_impact="Improve relevance of lifecycle marketing.",
+                action="Use reorder reminders and high-repeat products for customers with long gaps.",
+                expected_impact="Improve relevance of lifecycle marketing and shorten time to next order.",
                 priority="medium",
             ),
         ],
         insights=[
             Insight(
-                title="Customer behavior is frequency-led",
+                title="Longest order gaps are segment-specific",
                 category="customer_behavior",
-                finding=f"The modeled base has {total_users:,} users averaging {format_metric_number(avg_total_orders)} orders.",
+                finding=(
+                    f"{segment_name} includes {segment_users:,} users and has the longest average order gap "
+                    f"at {format_metric_number(segment_avg_gap)} days."
+                ),
                 evidence=[
+                    f"Overall average days between orders: {format_metric_number(avg_days_between_orders)}",
                     f"Average reorder ratio: {format_metric_percent(avg_reorder_ratio)}",
-                    f"Average days between orders: {format_metric_number(avg_days_between_orders)}",
+                    f"Average total orders across all customers: {format_metric_number(avg_total_orders)}",
                 ],
                 impact="medium",
-                recommended_action="Prioritize segments with long order gaps and low reorder ratios.",
+                recommended_action="Prioritize segments with the longest order gaps for reactivation campaigns.",
             )
         ],
         follow_up_questions=[
+            "Which specific customers have the longest days between orders?",
             "Which customer segments are at churn risk?",
             "Which products drive repeat purchases?",
-            "How does retention change by cohort period?",
         ],
-        data_sources=["feature_store"],
+        data_sources=["feature_store", "customer_segments", "customers_with_longest_order_gaps"],
     )
 
 
