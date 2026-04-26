@@ -16,6 +16,7 @@ router = APIRouter(prefix="/copilot", tags=["copilot"])
 
 InsightCategory = Literal["churn", "reorder_trend", "top_products", "customer_behavior", "retention", "clv", "general"]
 ImpactLevel = Literal["low", "medium", "high"]
+AIResponseSource = Literal["openai", "local_fallback"]
 
 
 class CopilotRequest(BaseModel):
@@ -46,6 +47,7 @@ class Recommendation(BaseModel):
 
 class CopilotResponse(BaseModel):
     question: str
+    ai_source: AIResponseSource = "local_fallback"
     summary: str
     explanation: str
     impacted_segments: list[ImpactedSegment]
@@ -320,6 +322,7 @@ def generate_structured_insights(
 
     parsed = CopilotResponse.model_validate(json.loads(content))
     parsed.question = question
+    parsed.ai_source = "openai"
     return parsed
 
 

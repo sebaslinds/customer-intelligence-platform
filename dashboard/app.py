@@ -197,6 +197,16 @@ def build_recommendation_priority_frame(recommendations: list[dict[str, Any]]) -
     return priority_frame.sort_values("sort_order", ascending=False).drop(columns="sort_order")
 
 
+def render_ai_source(response: dict[str, Any]) -> None:
+    ai_source = response.get("ai_source") or "local_fallback"
+    source_label = {
+        "openai": "OpenAI",
+        "local_fallback": "Local fallback",
+    }.get(str(ai_source), str(ai_source).replace("_", " ").title())
+
+    st.caption(f"AI Source: {source_label}")
+
+
 def render_header() -> None:
     st.title("Customer Intelligence Platform")
     st.caption("Snowflake-powered customer, order, and product intelligence")
@@ -311,6 +321,8 @@ def render_model_performance(metrics: dict[str, Any], feature_importance: pd.Dat
 
 
 def render_copilot_response(response: dict[str, Any], message_index: int | None = None) -> None:
+    render_ai_source(response)
+
     if summary := response.get("summary"):
         st.markdown(f"**Summary:** {summary}")
     if explanation := response.get("explanation"):
