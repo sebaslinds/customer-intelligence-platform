@@ -31,6 +31,8 @@ ml/artifacts/
 !ml/artifacts/
 ml/artifacts/*
 !ml/artifacts/random_forest_reorder_model.joblib
+!ml/artifacts/training_metrics.json
+!ml/artifacts/feature_importance.csv
 
 # dbt
 transformations/dbt/target/

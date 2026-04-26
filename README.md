@@ -155,6 +155,26 @@ POST /copilot/insights
 
 Generates structured business insights from Snowflake metrics, with a local fallback mode if the OpenAI API is unavailable.
 
+## Machine Learning
+
+The reorder model is trained on a time-aware dataset to reduce target leakage. For each training row, customer features are calculated from prior orders only, while the label indicates whether the next target order contains at least one reordered item.
+
+Current model artifacts:
+
+- Model: `ml/artifacts/random_forest_reorder_model.joblib`
+- Metrics: `ml/artifacts/training_metrics.json`
+- Feature importance: `ml/artifacts/feature_importance.csv`
+
+Current validation metrics:
+
+```text
+Accuracy: 0.615
+Precision: 0.963
+Recall: 0.612
+F1: 0.748
+ROC AUC: 0.682
+```
+
 ## Local Setup
 
 ### 1. Create a virtual environment
