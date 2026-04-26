@@ -30,6 +30,203 @@ API_HEALTH_TIMEOUT_SECONDS = 45
 STREAMLIT_APP_URL = "https://customer-intelligence-platform-d2pmcjetsrlgm2zwep7vgf.streamlit.app/"
 RENDER_API_URL = "https://customer-intelligence-platform-3v6q.onrender.com"
 
+TRANSLATIONS = {
+    "en": {
+        "toggle_language": "Afficher en français",
+        "title": "Customer Intelligence Platform",
+        "subtitle": "Snowflake-powered customer, order, and product intelligence",
+        "controls": "Controls",
+        "language": "Language",
+        "environment": "Environment",
+        "database": "Database",
+        "schema": "Schema",
+        "api": "API",
+        "refresh_data": "Refresh data",
+        "kpis": "KPIs",
+        "revenue_proxy": "Revenue Proxy",
+        "orders": "Orders",
+        "reorder_rate": "Reorder Rate",
+        "project_overview": "Project Overview",
+        "overview_intro": (
+            "A production-style customer intelligence platform that turns Instacart order data into "
+            "analytics marts, machine learning predictions, business dashboards, and AI-generated insights."
+        ),
+        "business_objective": "Business Objective",
+        "business_objective_text": (
+            "Help retail teams understand reorder behavior, identify churn risk, prioritize retention "
+            "actions, and surface product trends from customer purchase history."
+        ),
+        "key_capabilities": "Key Capabilities",
+        "key_capabilities_text": (
+            "Batch ingestion, Snowflake warehouse modeling, dbt transformations, feature engineering, "
+            "RandomForest scoring, FastAPI predictions, Streamlit analytics, and OpenAI copilot insights."
+        ),
+        "architecture": "Architecture",
+        "tech_stack": "Tech Stack",
+        "live_services": "Live Services",
+        "dashboard": "Dashboard",
+        "api_docs": "API Docs",
+        "health_check": "Health Check",
+        "portfolio_notes": "Portfolio Notes",
+        "portfolio_notes_text": (
+            "Revenue is represented as a proxy because the Instacart dataset does not include prices. "
+            "The AI copilot is grounded in aggregate Snowflake metrics and includes a local fallback mode "
+            "for resilience when OpenAI is unavailable."
+        ),
+        "customer_insights": "Customer Insights",
+        "no_customer_data": "No customer feature data found. Run the dbt feature_store model first.",
+        "product_trends": "Product Trends",
+        "no_product_data": "No product data found. Run the dim_products dbt model first.",
+        "data_quality": "Data Quality",
+        "data_quality_caption": "Live Snowflake checks for raw Instacart tables before downstream analytics.",
+        "data_quality_error": "Unable to load data quality results from Snowflake.",
+        "no_data_quality": "No data quality results found.",
+        "total_checks": "Total Checks",
+        "passed": "Passed",
+        "failed": "Failed",
+        "validation_results": "Validation Results",
+        "raw_table_row_counts": "Raw Table Row Counts",
+        "pipeline_health": "Pipeline Health",
+        "pipeline_health_caption": "Operational checks across Snowflake, marts, model artifacts, and the deployed API.",
+        "snowflake": "Snowflake",
+        "render_api": "Render API",
+        "model_artifact": "Model Artifact",
+        "model_metrics": "Model Metrics",
+        "available": "Available",
+        "missing": "Missing",
+        "service_checks": "Service Checks",
+        "snowflake_session": "Snowflake Session",
+        "raw_tables": "Raw Tables",
+        "mart_tables": "Mart Tables",
+        "table_counts_error": "Unable to load pipeline table counts from Snowflake.",
+        "model_performance": "Model Performance",
+        "no_model_metrics": "No model metrics found. Run the ML training pipeline first.",
+        "accuracy": "Accuracy",
+        "precision": "Precision",
+        "recall": "Recall",
+        "f1_score": "F1 Score",
+        "roc_auc": "ROC AUC",
+        "train_rows": "Train Rows",
+        "test_rows": "Test Rows",
+        "positive_rate": "Positive Rate",
+        "confusion_matrix": "Confusion Matrix",
+        "feature_importance": "Feature Importance",
+        "ai_copilot": "AI Copilot",
+        "ai_business_copilot": "AI Business Copilot",
+        "ai_copilot_caption": "Ask business questions about churn, reorders, products, retention, and customer behavior.",
+        "quick_prompts": "Quick prompts",
+        "ask_ai": "Ask for AI insights",
+        "generating_insights": "Generating insights from Snowflake metrics...",
+        "copilot_api_error": "Unable to reach the copilot API. Check API_BASE_URL and the Render service status.",
+        "ai_source": "AI Source",
+        "summary": "Summary",
+        "impacted_segments": "Impacted Segments",
+        "metric_comparison": "Metric comparison",
+        "recommendations": "Recommendations",
+        "priority_mix": "Recommendation priority mix",
+        "detailed_insights": "Detailed Insights",
+        "evidence": "Evidence",
+        "follow_up_questions": "Follow-up questions",
+    },
+    "fr": {
+        "toggle_language": "Show in English",
+        "title": "Plateforme d'intelligence client",
+        "subtitle": "Analyse clients, commandes et produits propulsée par Snowflake",
+        "controls": "Contrôles",
+        "language": "Langue",
+        "environment": "Environnement",
+        "database": "Base de données",
+        "schema": "Schéma",
+        "api": "API",
+        "refresh_data": "Rafraîchir les données",
+        "kpis": "Indicateurs",
+        "revenue_proxy": "Proxy De Revenus",
+        "orders": "Commandes",
+        "reorder_rate": "Taux de recommande",
+        "project_overview": "Vue d'ensemble",
+        "overview_intro": (
+            "Une plateforme de type production qui transforme les données de commandes Instacart en "
+            "marts analytiques, prédictions machine learning, tableaux de bord et insights générés par IA."
+        ),
+        "business_objective": "Objectif Business",
+        "business_objective_text": (
+            "Aider les equipes retail a comprendre les comportements de recommande, identifier le risque "
+            "de churn, prioriser la retention et faire ressortir les tendances produits."
+        ),
+        "key_capabilities": "Capacités clés",
+        "key_capabilities_text": (
+            "Ingestion batch, modelisation Snowflake, transformations dbt, feature engineering, scoring "
+            "RandomForest, predictions FastAPI, analyses Streamlit et insights OpenAI."
+        ),
+        "architecture": "Architecture",
+        "tech_stack": "Stack technique",
+        "live_services": "Services Live",
+        "dashboard": "Dashboard",
+        "api_docs": "Docs API",
+        "health_check": "Health Check",
+        "portfolio_notes": "Notes Portfolio",
+        "portfolio_notes_text": (
+            "Les revenus sont représentés par un proxy, car le dataset Instacart ne contient pas les prix. "
+            "Le copilot IA est ancré dans les métriques agrégées Snowflake et inclut un mode fallback local "
+            "si OpenAI n'est pas disponible."
+        ),
+        "customer_insights": "Insights Clients",
+        "no_customer_data": "Aucune donnee client trouvee. Lance d'abord le modele dbt feature_store.",
+        "product_trends": "Tendances Produits",
+        "no_product_data": "Aucune donnee produit trouvee. Lance d'abord le modele dbt dim_products.",
+        "data_quality": "Qualité des données",
+        "data_quality_caption": "Validations Snowflake live sur les tables brutes avant les analyses downstream.",
+        "data_quality_error": "Impossible de charger les resultats de qualite depuis Snowflake.",
+        "no_data_quality": "Aucun resultat de qualite trouve.",
+        "total_checks": "Checks Totaux",
+        "passed": "Reussis",
+        "failed": "Echoues",
+        "validation_results": "Resultats De Validation",
+        "raw_table_row_counts": "Volumes Des Tables Raw",
+        "pipeline_health": "Santé du pipeline",
+        "pipeline_health_caption": "Checks operationnels sur Snowflake, les marts, les artefacts modele et l'API deployee.",
+        "snowflake": "Snowflake",
+        "render_api": "API Render",
+        "model_artifact": "Artefact Modele",
+        "model_metrics": "Metriques Modele",
+        "available": "Disponible",
+        "missing": "Manquant",
+        "service_checks": "Checks Des Services",
+        "snowflake_session": "Session Snowflake",
+        "raw_tables": "Tables Raw",
+        "mart_tables": "Tables Marts",
+        "table_counts_error": "Impossible de charger les volumes des tables depuis Snowflake.",
+        "model_performance": "Performance modèle",
+        "no_model_metrics": "Aucune metrique modele trouvee. Lance d'abord le pipeline ML.",
+        "accuracy": "Accuracy",
+        "precision": "Precision",
+        "recall": "Recall",
+        "f1_score": "F1 Score",
+        "roc_auc": "ROC AUC",
+        "train_rows": "Lignes Train",
+        "test_rows": "Lignes Test",
+        "positive_rate": "Taux Positif",
+        "confusion_matrix": "Matrice De Confusion",
+        "feature_importance": "Importance des features",
+        "ai_copilot": "Copilot IA",
+        "ai_business_copilot": "Copilot Business IA",
+        "ai_copilot_caption": "Pose des questions business sur le churn, les recommandes, les produits, la retention et les clients.",
+        "quick_prompts": "Prompts Rapides",
+        "ask_ai": "Demander des insights IA",
+        "generating_insights": "Generation d'insights depuis les metriques Snowflake...",
+        "copilot_api_error": "Impossible de joindre l'API copilot. Verifie API_BASE_URL et le statut Render.",
+        "ai_source": "Source IA",
+        "summary": "Résumé",
+        "impacted_segments": "Segments impactés",
+        "metric_comparison": "Comparaison des métriques",
+        "recommendations": "Recommandations",
+        "priority_mix": "Mix Des Priorites",
+        "detailed_insights": "Insights détaillés",
+        "evidence": "Evidence",
+        "follow_up_questions": "Questions de suivi",
+    },
+}
+
 
 st.set_page_config(
     page_title="Customer Intelligence Platform",
@@ -331,6 +528,20 @@ def queue_copilot_question(question: str) -> None:
     st.rerun()
 
 
+def get_language() -> str:
+    return str(st.session_state.get("language", "en"))
+
+
+def translate(key: str) -> str:
+    language = get_language()
+    return TRANSLATIONS.get(language, TRANSLATIONS["en"]).get(key, TRANSLATIONS["en"].get(key, key))
+
+
+def toggle_language() -> None:
+    st.session_state.language = "fr" if get_language() == "en" else "en"
+    st.rerun()
+
+
 def format_number(value: Any) -> str:
     if pd.isna(value):
         return "0"
@@ -406,38 +617,29 @@ def render_ai_source(response: dict[str, Any]) -> None:
         "local_fallback": "Local fallback",
     }.get(str(ai_source), str(ai_source).replace("_", " ").title())
 
-    st.caption(f"AI Source: {source_label}")
+    st.caption(f"{translate('ai_source')}: {source_label}")
     if source_detail := response.get("ai_source_detail"):
         st.caption(str(source_detail))
 
 
 def render_header() -> None:
-    st.title("Customer Intelligence Platform")
-    st.caption("Snowflake-powered customer, order, and product intelligence")
+    st.title(translate("title"))
+    st.caption(translate("subtitle"))
 
 
 def render_project_overview() -> None:
-    st.subheader("Project Overview")
-    st.write(
-        "A production-style customer intelligence platform that turns Instacart order data into "
-        "analytics marts, machine learning predictions, business dashboards, and AI-generated insights."
-    )
+    st.subheader(translate("project_overview"))
+    st.write(translate("overview_intro"))
 
     objective_column, capabilities_column = st.columns(2)
     with objective_column:
-        st.markdown("**Business Objective**")
-        st.write(
-            "Help retail teams understand reorder behavior, identify churn risk, prioritize retention "
-            "actions, and surface product trends from customer purchase history."
-        )
+        st.markdown(f"**{translate('business_objective')}**")
+        st.write(translate("business_objective_text"))
     with capabilities_column:
-        st.markdown("**Key Capabilities**")
-        st.write(
-            "Batch ingestion, Snowflake warehouse modeling, dbt transformations, feature engineering, "
-            "RandomForest scoring, FastAPI predictions, Streamlit analytics, and OpenAI copilot insights."
-        )
+        st.markdown(f"**{translate('key_capabilities')}**")
+        st.write(translate("key_capabilities_text"))
 
-    st.markdown("**Architecture**")
+    st.markdown(f"**{translate('architecture')}**")
     architecture_steps = pd.DataFrame(
         [
             {"step": "1", "layer": "Data Source", "component": "Instacart CSV files"},
@@ -451,7 +653,7 @@ def render_project_overview() -> None:
     )
     st.dataframe(architecture_steps, use_container_width=True, hide_index=True)
 
-    st.markdown("**Tech Stack**")
+    st.markdown(f"**{translate('tech_stack')}**")
     stack_frame = pd.DataFrame(
         [
             {"area": "Backend", "tools": "Python, FastAPI, Pydantic"},
@@ -465,33 +667,29 @@ def render_project_overview() -> None:
     )
     st.dataframe(stack_frame, use_container_width=True, hide_index=True)
 
-    st.markdown("**Live Services**")
+    st.markdown(f"**{translate('live_services')}**")
     dashboard_url, api_docs_url, health_url = st.columns(3)
-    dashboard_url.link_button("Dashboard", STREAMLIT_APP_URL, use_container_width=True)
-    api_docs_url.link_button("API Docs", f"{RENDER_API_URL}/docs", use_container_width=True)
-    health_url.link_button("Health Check", f"{RENDER_API_URL}/health", use_container_width=True)
+    dashboard_url.link_button(translate("dashboard"), STREAMLIT_APP_URL, use_container_width=True)
+    api_docs_url.link_button(translate("api_docs"), f"{RENDER_API_URL}/docs", use_container_width=True)
+    health_url.link_button(translate("health_check"), f"{RENDER_API_URL}/health", use_container_width=True)
 
-    st.markdown("**Portfolio Notes**")
-    st.info(
-        "Revenue is represented as a proxy because the Instacart dataset does not include prices. "
-        "The AI copilot is grounded in aggregate Snowflake metrics and includes a local fallback mode "
-        "for resilience when OpenAI is unavailable."
-    )
+    st.markdown(f"**{translate('portfolio_notes')}**")
+    st.info(translate("portfolio_notes_text"))
 
 
 def render_kpis(kpis: dict[str, Any]) -> None:
-    st.subheader("KPIs")
+    st.subheader(translate("kpis"))
     revenue_proxy, total_orders, reorder_rate = st.columns(3)
 
-    revenue_proxy.metric("Revenue Proxy", format_number(kpis.get("revenue_proxy", 0)))
-    total_orders.metric("Orders", format_number(kpis.get("total_orders", 0)))
-    reorder_rate.metric("Reorder Rate", format_percent(kpis.get("reorder_rate", 0)))
+    revenue_proxy.metric(translate("revenue_proxy"), format_number(kpis.get("revenue_proxy", 0)))
+    total_orders.metric(translate("orders"), format_number(kpis.get("total_orders", 0)))
+    reorder_rate.metric(translate("reorder_rate"), format_percent(kpis.get("reorder_rate", 0)))
 
 
 def render_customer_insights(frame: pd.DataFrame) -> None:
-    st.subheader("Customer Insights")
+    st.subheader(translate("customer_insights"))
     if frame.empty:
-        st.info("No customer feature data found. Run the dbt feature_store model first.")
+        st.info(translate("no_customer_data"))
         return
 
     chart_data = frame.head(15).set_index("user_id")[["total_orders", "unique_products"]]
@@ -514,9 +712,9 @@ def render_customer_insights(frame: pd.DataFrame) -> None:
 
 
 def render_product_trends(frame: pd.DataFrame) -> None:
-    st.subheader("Product Trends")
+    st.subheader(translate("product_trends"))
     if frame.empty:
-        st.info("No product data found. Run the dim_products dbt model first.")
+        st.info(translate("no_product_data"))
         return
 
     chart_data = frame.head(15).set_index("product_name")["order_line_count"]
@@ -538,20 +736,20 @@ def render_product_trends(frame: pd.DataFrame) -> None:
 
 
 def render_data_quality() -> None:
-    st.subheader("Data Quality")
-    st.caption("Live Snowflake checks for raw Instacart tables before downstream analytics.")
+    st.subheader(translate("data_quality"))
+    st.caption(translate("data_quality_caption"))
 
     try:
         quality_results = load_data_quality_results()
         raw_counts = load_raw_table_counts()
     except Exception as exc:
         logger.exception("Failed to load data quality results")
-        st.error("Unable to load data quality results from Snowflake.")
+        st.error(translate("data_quality_error"))
         st.exception(exc)
         return
 
     if quality_results.empty:
-        st.info("No data quality results found.")
+        st.info(translate("no_data_quality"))
         return
 
     total_checks = len(quality_results)
@@ -559,14 +757,14 @@ def render_data_quality() -> None:
     failed_checks = total_checks - passed_checks
 
     total_column, passed_column, failed_column = st.columns(3)
-    total_column.metric("Total Checks", format_number(total_checks))
-    passed_column.metric("Passed", format_number(passed_checks))
-    failed_column.metric("Failed", format_number(failed_checks))
+    total_column.metric(translate("total_checks"), format_number(total_checks))
+    passed_column.metric(translate("passed"), format_number(passed_checks))
+    failed_column.metric(translate("failed"), format_number(failed_checks))
 
     status_summary = quality_results["status"].value_counts().rename_axis("status").reset_index(name="checks")
     st.bar_chart(status_summary.set_index("status")["checks"])
 
-    st.markdown("**Validation Results**")
+    st.markdown(f"**{translate('validation_results')}**")
     st.dataframe(
         quality_results,
         use_container_width=True,
@@ -580,7 +778,7 @@ def render_data_quality() -> None:
     )
 
     if not raw_counts.empty:
-        st.markdown("**Raw Table Row Counts**")
+        st.markdown(f"**{translate('raw_table_row_counts')}**")
         st.bar_chart(raw_counts.set_index("table_name")["row_count"])
         st.dataframe(
             raw_counts,
@@ -594,8 +792,8 @@ def render_data_quality() -> None:
 
 
 def render_pipeline_health() -> None:
-    st.subheader("Pipeline Health")
-    st.caption("Operational checks across Snowflake, marts, model artifacts, and the deployed API.")
+    st.subheader(translate("pipeline_health"))
+    st.caption(translate("pipeline_health_caption"))
 
     snowflake_status = "Failed"
     snowflake_detail: dict[str, Any] = {}
@@ -619,10 +817,10 @@ def render_pipeline_health() -> None:
     metrics_exists = MODEL_METRICS_PATH.exists()
 
     snowflake_column, api_column, model_column, metrics_column = st.columns(4)
-    snowflake_column.metric("Snowflake", snowflake_status)
-    api_column.metric("Render API", api_status)
-    model_column.metric("Model Artifact", "Available" if model_exists else "Missing")
-    metrics_column.metric("Model Metrics", "Available" if metrics_exists else "Missing")
+    snowflake_column.metric(translate("snowflake"), snowflake_status)
+    api_column.metric(translate("render_api"), api_status)
+    model_column.metric(translate("model_artifact"), translate("available") if model_exists else translate("missing"))
+    metrics_column.metric(translate("model_metrics"), translate("available") if metrics_exists else translate("missing"))
 
     health_rows = [
         {
@@ -637,20 +835,20 @@ def render_pipeline_health() -> None:
         },
         {
             "component": "Model artifact",
-            "status": "Available" if model_exists else "Missing",
+            "status": translate("available") if model_exists else translate("missing"),
             "detail": settings.model_path,
         },
         {
             "component": "Training metrics",
-            "status": "Available" if metrics_exists else "Missing",
+            "status": translate("available") if metrics_exists else translate("missing"),
             "detail": str(MODEL_METRICS_PATH.relative_to(PROJECT_ROOT)),
         },
     ]
-    st.markdown("**Service Checks**")
+    st.markdown(f"**{translate('service_checks')}**")
     st.dataframe(pd.DataFrame(health_rows), use_container_width=True, hide_index=True)
 
     if snowflake_status == "Connected":
-        st.markdown("**Snowflake Session**")
+        st.markdown(f"**{translate('snowflake_session')}**")
         session_frame = pd.DataFrame([snowflake_detail])
         st.dataframe(session_frame, use_container_width=True, hide_index=True)
 
@@ -659,13 +857,13 @@ def render_pipeline_health() -> None:
         mart_counts = load_mart_table_counts()
     except Exception as exc:
         logger.exception("Failed to load pipeline table counts")
-        st.error("Unable to load pipeline table counts from Snowflake.")
+        st.error(translate("table_counts_error"))
         st.exception(exc)
         return
 
     raw_column, mart_column = st.columns(2)
     with raw_column:
-        st.markdown("**Raw Tables**")
+        st.markdown(f"**{translate('raw_tables')}**")
         st.bar_chart(raw_counts.set_index("table_name")["row_count"])
         st.dataframe(
             raw_counts,
@@ -678,7 +876,7 @@ def render_pipeline_health() -> None:
         )
 
     with mart_column:
-        st.markdown("**Mart Tables**")
+        st.markdown(f"**{translate('mart_tables')}**")
         st.bar_chart(mart_counts.set_index("table_name")["row_count"])
         st.dataframe(
             mart_counts,
@@ -692,22 +890,22 @@ def render_pipeline_health() -> None:
 
 
 def render_model_performance(metrics: dict[str, Any], feature_importance: pd.DataFrame) -> None:
-    st.subheader("Model Performance")
+    st.subheader(translate("model_performance"))
     if not metrics:
-        st.info("No model metrics found. Run the ML training pipeline first.")
+        st.info(translate("no_model_metrics"))
         return
 
     accuracy, precision, recall, f1_score, roc_auc = st.columns(5)
-    accuracy.metric("Accuracy", format_percent(metrics.get("accuracy", 0)))
-    precision.metric("Precision", format_percent(metrics.get("precision", 0)))
-    recall.metric("Recall", format_percent(metrics.get("recall", 0)))
-    f1_score.metric("F1 Score", format_percent(metrics.get("f1", 0)))
-    roc_auc.metric("ROC AUC", f"{float(metrics.get('roc_auc') or 0):.3f}")
+    accuracy.metric(translate("accuracy"), format_percent(metrics.get("accuracy", 0)))
+    precision.metric(translate("precision"), format_percent(metrics.get("precision", 0)))
+    recall.metric(translate("recall"), format_percent(metrics.get("recall", 0)))
+    f1_score.metric(translate("f1_score"), format_percent(metrics.get("f1", 0)))
+    roc_auc.metric(translate("roc_auc"), f"{float(metrics.get('roc_auc') or 0):.3f}")
 
     train_rows, test_rows, positive_rate = st.columns(3)
-    train_rows.metric("Train Rows", format_number(metrics.get("train_rows", 0)))
-    test_rows.metric("Test Rows", format_number(metrics.get("test_rows", 0)))
-    positive_rate.metric("Positive Rate", format_percent(metrics.get("positive_rate", 0)))
+    train_rows.metric(translate("train_rows"), format_number(metrics.get("train_rows", 0)))
+    test_rows.metric(translate("test_rows"), format_number(metrics.get("test_rows", 0)))
+    positive_rate.metric(translate("positive_rate"), format_percent(metrics.get("positive_rate", 0)))
 
     st.divider()
 
@@ -718,11 +916,11 @@ def render_model_performance(metrics: dict[str, Any], feature_importance: pd.Dat
             index=["Actual No Reorder", "Actual Reorder"],
             columns=["Predicted No Reorder", "Predicted Reorder"],
         )
-        st.subheader("Confusion Matrix")
+        st.subheader(translate("confusion_matrix"))
         st.dataframe(confusion_frame, use_container_width=True)
 
     if not feature_importance.empty:
-        st.subheader("Feature Importance")
+        st.subheader(translate("feature_importance"))
         chart_data = feature_importance.set_index("feature")["importance"]
         st.bar_chart(chart_data)
         st.dataframe(
@@ -745,13 +943,13 @@ def render_copilot_response(response: dict[str, Any], message_index: int | None 
     render_ai_source(response)
 
     if summary := response.get("summary"):
-        st.markdown(f"**Summary:** {summary}")
+        st.markdown(f"**{translate('summary')}:** {summary}")
     if explanation := response.get("explanation"):
         st.write(explanation)
 
     impacted_segments = response.get("impacted_segments") or []
     if impacted_segments:
-        st.markdown("**Impacted Segments**")
+        st.markdown(f"**{translate('impacted_segments')}**")
         segment_frame = pd.DataFrame(impacted_segments)
         chart_frame = build_segments_chart_frame(impacted_segments)
         if chart_frame.empty:
@@ -761,12 +959,12 @@ def render_copilot_response(response: dict[str, Any], message_index: int | None 
             with table_column:
                 st.dataframe(segment_frame, use_container_width=True, hide_index=True)
             with chart_column:
-                st.caption("Metric comparison")
+                st.caption(translate("metric_comparison"))
                 st.bar_chart(chart_frame.set_index("segment")["value"])
 
     recommendations = response.get("recommendations") or []
     if recommendations:
-        st.markdown("**Recommendations**")
+        st.markdown(f"**{translate('recommendations')}**")
         for recommendation in recommendations:
             priority = recommendation.get("priority", "medium")
             action = recommendation.get("action", "")
@@ -775,22 +973,22 @@ def render_copilot_response(response: dict[str, Any], message_index: int | None 
 
         priority_frame = build_recommendation_priority_frame(recommendations)
         if not priority_frame.empty:
-            st.caption("Recommendation priority mix")
+            st.caption(translate("priority_mix"))
             st.bar_chart(priority_frame.set_index("priority")["count"])
 
     insights = response.get("insights") or []
     if insights:
-        with st.expander("Detailed Insights"):
+        with st.expander(translate("detailed_insights")):
             for insight in insights:
                 st.markdown(f"**{insight.get('title', 'Insight')}**")
                 st.write(insight.get("finding", ""))
                 evidence = insight.get("evidence") or []
                 if evidence:
-                    st.caption("Evidence: " + " | ".join(str(item) for item in evidence))
+                    st.caption(f"{translate('evidence')}: " + " | ".join(str(item) for item in evidence))
 
     follow_up_questions = response.get("follow_up_questions") or []
     if follow_up_questions:
-        st.markdown("**Follow-up questions**")
+        st.markdown(f"**{translate('follow_up_questions')}**")
         for index, follow_up_question in enumerate(follow_up_questions):
             key_parts = ["follow_up", str(message_index if message_index is not None else "live"), str(index)]
             button_key = "_".join(key_parts)
@@ -799,14 +997,14 @@ def render_copilot_response(response: dict[str, Any], message_index: int | None 
 
 
 def render_ai_copilot() -> None:
-    st.subheader("AI Business Copilot")
-    st.caption("Ask business questions about churn, reorders, products, retention, and customer behavior.")
+    st.subheader(translate("ai_business_copilot"))
+    st.caption(translate("ai_copilot_caption"))
 
     if "copilot_messages" not in st.session_state:
         st.session_state.copilot_messages = [
             {
                 "role": "assistant",
-                "content": "Ask me about churn, reorder trends, top products, retention, or customer segments.",
+                "content": translate("ai_copilot_caption"),
             }
         ]
 
@@ -816,7 +1014,7 @@ def render_ai_copilot() -> None:
         "Which customer segments are at churn risk?",
         "How can we improve retention?",
     ]
-    st.markdown("**Quick prompts**")
+    st.markdown(f"**{translate('quick_prompts')}**")
     prompt_columns = st.columns(2)
     for index, example in enumerate(examples):
         with prompt_columns[index % 2]:
@@ -831,7 +1029,7 @@ def render_ai_copilot() -> None:
             else:
                 st.write(content)
 
-    question = st.chat_input("Ask for AI insights")
+    question = st.chat_input(translate("ask_ai"))
     pending_question = st.session_state.pop("pending_copilot_question", None)
     question = question or pending_question
     if not question:
@@ -842,14 +1040,12 @@ def render_ai_copilot() -> None:
         st.write(question)
 
     with st.chat_message("assistant"):
-        with st.spinner("Generating insights from Snowflake metrics..."):
+        with st.spinner(translate("generating_insights")):
             try:
                 response = request_copilot_insights(question)
             except requests.RequestException as exc:
                 logger.exception("Copilot API request failed")
-                error_message = (
-                    "Unable to reach the copilot API. Check API_BASE_URL and the Render service status."
-                )
+                error_message = translate("copilot_api_error")
                 st.error(error_message)
                 st.caption(str(exc))
                 st.session_state.copilot_messages.append({"role": "assistant", "content": error_message})
@@ -860,12 +1056,15 @@ def render_ai_copilot() -> None:
 
 
 def render_sidebar() -> None:
-    st.sidebar.header("Controls")
-    st.sidebar.write(f"Environment: `{settings.app_env}`")
-    st.sidebar.write(f"Database: `{settings.snowflake_database or 'not configured'}`")
-    st.sidebar.write(f"Schema: `{settings.snowflake_schema or 'not configured'}`")
-    st.sidebar.write(f"API: `{settings.api_base_url}`")
-    if st.sidebar.button("Refresh data"):
+    st.sidebar.header(translate("controls"))
+    st.sidebar.write(f"{translate('language')}: `{'Français' if get_language() == 'fr' else 'English'}`")
+    if st.sidebar.button(translate("toggle_language")):
+        toggle_language()
+    st.sidebar.write(f"{translate('environment')}: `{settings.app_env}`")
+    st.sidebar.write(f"{translate('database')}: `{settings.snowflake_database or 'not configured'}`")
+    st.sidebar.write(f"{translate('schema')}: `{settings.snowflake_schema or 'not configured'}`")
+    st.sidebar.write(f"{translate('api')}: `{settings.api_base_url}`")
+    if st.sidebar.button(translate("refresh_data")):
         st.cache_data.clear()
         st.rerun()
 
@@ -891,13 +1090,13 @@ def main() -> None:
 
     overview_tab, customer_tab, product_tab, quality_tab, health_tab, model_tab, copilot_tab = st.tabs(
         [
-            "Project Overview",
-            "Customer Insights",
-            "Product Trends",
-            "Data Quality",
-            "Pipeline Health",
-            "Model Performance",
-            "AI Copilot",
+            translate("project_overview"),
+            translate("customer_insights"),
+            translate("product_trends"),
+            translate("data_quality"),
+            translate("pipeline_health"),
+            translate("model_performance"),
+            translate("ai_copilot"),
         ]
     )
     with overview_tab:
