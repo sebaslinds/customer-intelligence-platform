@@ -646,7 +646,9 @@ def render_bar_chart(
         )
     )
     labels = bars.mark_text(dy=-8, color="#475569").encode(text=alt.Text(f"{y_column}:Q", format=",.0f"))
-    chart = (bars + labels).properties(title=title, height=height)
+    chart = (bars + labels).properties(height=height)
+    if title:
+        chart = chart.properties(title=title)
     st.altair_chart(chart, use_container_width=True)
 
 
