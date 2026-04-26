@@ -66,12 +66,13 @@ def load_customer_insights() -> pd.DataFrame:
         select
             user_id,
             total_orders,
+            observed_basket_orders,
             avg_basket_size,
             reorder_ratio,
             unique_products,
             days_between_orders
         from feature_store
-        order by total_orders desc, reorder_ratio desc
+        order by total_orders desc, user_id
         limit 25
     """
     return query_snowflake(query)
@@ -152,8 +153,9 @@ def render_customer_insights(frame: pd.DataFrame) -> None:
         column_config={
             "user_id": "User ID",
             "total_orders": st.column_config.NumberColumn("Total Orders", format="%d"),
+            "observed_basket_orders": st.column_config.NumberColumn("Observed Baskets", format="%d"),
             "avg_basket_size": st.column_config.NumberColumn("Avg Basket Size", format="%.2f"),
-            "reorder_ratio": st.column_config.ProgressColumn("Reorder Ratio", format="%.1f", min_value=0, max_value=1),
+            "reorder_ratio": st.column_config.ProgressColumn("Reorder Ratio", format="%.2f", min_value=0, max_value=1),
             "unique_products": st.column_config.NumberColumn("Unique Products", format="%d"),
             "days_between_orders": st.column_config.NumberColumn("Days Between Orders", format="%.2f"),
         },
@@ -179,7 +181,7 @@ def render_product_trends(frame: pd.DataFrame) -> None:
             "aisle": "Aisle",
             "order_line_count": st.column_config.NumberColumn("Order Lines", format="%d"),
             "reordered_line_count": st.column_config.NumberColumn("Reordered Lines", format="%d"),
-            "reorder_rate": st.column_config.ProgressColumn("Reorder Rate", format="%.1f", min_value=0, max_value=1),
+            "reorder_rate": st.column_config.ProgressColumn("Reorder Rate", format="%.2f", min_value=0, max_value=1),
         },
     )
 

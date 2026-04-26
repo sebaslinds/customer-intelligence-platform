@@ -30,8 +30,13 @@ user_order_features as (
     select
         user_id,
         count(distinct order_id) as total_orders,
-        coalesce(avg(item_count), 0) as avg_basket_size,
-        coalesce(sum(reordered_item_count) / nullif(sum(item_count), 0), 0) as reorder_ratio,
+        count_if(item_count > 0) as observed_basket_orders,
+        coalesce(avg(nullif(item_count, 0)), 0) as avg_basket_size,
+        case
+            when sum(item_count) > 0
+                then (sum(reordered_item_count) + 0.5) / (sum(item_count) + 1)
+            else 0
+        end as reorder_ratio,
         coalesce(avg(days_since_prior_order), 0) as days_between_orders,
         case
             when sum(reordered_item_count) > 0 then 1
@@ -57,6 +62,7 @@ final as (
     select
         user_order_features.user_id,
         user_order_features.total_orders,
+        user_order_features.observed_basket_orders,
         user_order_features.avg_basket_size,
         user_order_features.reorder_ratio,
         coalesce(user_product_features.unique_products, 0) as unique_products,

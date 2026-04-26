@@ -49,11 +49,15 @@ models:
         tests:
           - not_null
       - name: avg_basket_size
-        description: Average number of items per order.
+        description: Average number of items per observed basket. Prior order basket lines are unavailable in the sampled dataset.
+        tests:
+          - not_null
+      - name: observed_basket_orders
+        description: Number of orders with observed item-level basket data.
         tests:
           - not_null
       - name: reorder_ratio
-        description: Share of ordered items that were reorders.
+        description: Smoothed share of observed ordered items that were reorders.
         tests:
           - not_null
       - name: unique_products
