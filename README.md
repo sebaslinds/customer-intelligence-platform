@@ -1,56 +1,101 @@
 # Customer Intelligence Platform
 
-Production-ready customer analytics platform built with Python, Snowflake, dbt, FastAPI, Streamlit, and machine learning.
+An end-to-end data engineering, machine learning, and AI analytics platform built on Instacart-style customer order data.
 
-The project ingests Instacart-style customer order data, models it in Snowflake with dbt, builds reusable customer features, trains a reorder prediction model, exposes predictions through an API, and visualizes business KPIs in a live dashboard.
+The platform ingests raw CSV files, models them in Snowflake with dbt, builds customer-level features, trains a reorder prediction model, serves predictions with FastAPI, visualizes insights in Streamlit, and generates business recommendations with an OpenAI-powered copilot.
 
 ## Live Demo
 
-- Streamlit dashboard: https://customer-intelligence-platform-d2pmcjetsrlgm2zwep7vgf.streamlit.app/
-- Render API health check: https://customer-intelligence-platform-3v6q.onrender.com/health
-- Render API docs: https://customer-intelligence-platform-3v6q.onrender.com/docs
+| Service | Link |
+| --- | --- |
+| Streamlit Dashboard | https://customer-intelligence-platform-d2pmcjetsrlgm2zwep7vgf.streamlit.app/ |
+| FastAPI Docs | https://customer-intelligence-platform-3v6q.onrender.com/docs |
+| API Health Check | https://customer-intelligence-platform-3v6q.onrender.com/health |
 
-## Highlights
+## Business Problem
 
-- End-to-end data engineering workflow from raw CSV ingestion to analytics marts
-- Snowflake-backed warehouse architecture
-- dbt staging and mart models with data tests
-- Feature engineering layer for customer-level ML features
-- Random Forest reorder prediction model
-- FastAPI prediction and AI copilot endpoints
-- Streamlit dashboard connected directly to Snowflake
-- Dashboard chatbot for AI-generated business insights
-- Structured logging and pipeline metrics
-- GitHub Actions CI for linting, tests, and dbt validation
+Retail teams need a reliable way to understand reorder behavior, identify churn risk, monitor retention, and surface product trends from customer purchase history.
+
+This project demonstrates how a modern data stack can convert raw transaction data into:
+
+- executive KPIs
+- clean analytics marts
+- customer-level machine learning features
+- reorder probability predictions
+- product and customer insights
+- AI-generated business recommendations
+
+## Key Features
+
+- Batch ingestion from raw Instacart CSV files into Snowflake
+- Modular dbt project with staging, fact, dimension, and mart models
+- Incremental fact model for order processing
+- Customer feature store for analytics and machine learning
+- Advanced analytics marts for retention, churn probability, and customer lifetime value
+- RandomForest classification model for reorder prediction
+- FastAPI service with `/health`, `/predict`, and `/copilot/insights`
+- Streamlit dashboard deployed on Streamlit Cloud
+- AI copilot powered by OpenAI and grounded in Snowflake metrics
+- Local fallback mode when OpenAI is unavailable
+- Structured logging, data validation, and CI/CD with GitHub Actions
 - Deployment-ready configuration for Render and Streamlit Cloud
 
 ## Architecture
 
 ```text
-Raw Instacart CSVs
-        |
-        v
-Python ingestion pipeline
-        |
-        v
-Snowflake raw tables
-        |
-        v
-dbt staging models
-        |
-        v
-dbt mart models
-        |
-        +--> Streamlit dashboard
-        |
-        +--> Feature store
-                 |
-                 v
-            ML training
-                 |
-                 v
-            FastAPI prediction service
+Instacart CSV Files
+    |
+    v
+Python Ingestion Pipeline
+    |
+    v
+Snowflake Raw Tables
+    |
+    v
+dbt Staging Models
+    |
+    v
+dbt Mart Models
+    |
+    +--> Customer and Product Analytics
+    |
+    +--> Feature Store
+             |
+             v
+        RandomForest Model Training
+             |
+             v
+        FastAPI Prediction Service
+             |
+             v
+        Streamlit Dashboard
+             |
+             v
+        OpenAI Business Copilot
 ```
+
+Detailed documentation:
+
+- [Architecture](docs/architecture.md)
+- [Project Walkthrough](docs/project_walkthrough.md)
+
+## Tech Stack
+
+| Area | Tools |
+| --- | --- |
+| Language | Python |
+| Data Warehouse | Snowflake |
+| Transformations | dbt |
+| Data Processing | pandas, SQLAlchemy |
+| Machine Learning | scikit-learn, joblib |
+| API | FastAPI, Pydantic, Uvicorn |
+| Dashboard | Streamlit |
+| AI | OpenAI API |
+| Data Quality | Great Expectations-inspired validation checks |
+| Orchestration | Apache Airflow DAG scaffold |
+| Streaming | Kafka producer and consumer scaffold |
+| CI/CD | GitHub Actions |
+| Deployment | Render, Streamlit Cloud |
 
 ## Repository Structure
 
@@ -61,6 +106,7 @@ customer-intelligence-platform/
   dashboard/              Streamlit dashboard
   data/raw/               Local raw data landing area
   data_quality/           Snowflake data validation checks
+  docs/                   Architecture and project walkthrough
   ingestion/              CSV ingestion and Snowflake loading
   ml/                     Feature engineering, training, and model artifacts
   orchestration/airflow/  Airflow DAG for pipeline orchestration
@@ -69,31 +115,15 @@ customer-intelligence-platform/
   utils/                  Shared logging utilities
 ```
 
-## Tech Stack
-
-- Python
-- Snowflake
-- dbt
-- FastAPI
-- Streamlit
-- scikit-learn
-- pandas
-- SQLAlchemy
-- Apache Airflow
-- Kafka
-- GitHub Actions
-- Render
-- Streamlit Cloud
-
 ## Data Models
 
-### Staging
+### Staging Models
 
 - `stg_orders`
 - `stg_order_products`
 - `stg_products`
 
-### Marts
+### Mart Models
 
 - `fct_orders`
 - `dim_products`
@@ -103,9 +133,39 @@ customer-intelligence-platform/
 - `customer_churn_probability`
 - `customer_lifetime_value`
 
-## API Endpoints
+## Machine Learning
 
-### Health
+The reorder model is trained on customer behavioral features from Snowflake.
+
+Feature examples:
+
+- `total_orders`
+- `avg_basket_size`
+- `reorder_ratio`
+- `unique_products`
+- `days_between_orders`
+
+Current model artifacts:
+
+- `ml/artifacts/random_forest_reorder_model.joblib`
+- `ml/artifacts/training_metrics.json`
+- `ml/artifacts/feature_importance.csv`
+
+Current validation metrics:
+
+```text
+Accuracy: 0.615
+Precision: 0.963
+Recall: 0.612
+F1: 0.748
+ROC AUC: 0.682
+```
+
+The dashboard includes model performance metrics, feature importance, and a confusion matrix.
+
+## API
+
+### Health Check
 
 ```http
 GET /health
@@ -121,7 +181,7 @@ Example response:
 }
 ```
 
-### Prediction
+### Reorder Prediction
 
 ```http
 POST /predict
@@ -143,7 +203,7 @@ Example response:
 
 ```json
 {
-  "reorder_probability": 1,
+  "reorder_probability": 0.72,
   "model_version": "random_forest_reorder_model"
 }
 ```
@@ -154,28 +214,44 @@ Example response:
 POST /copilot/insights
 ```
 
-Generates structured business insights from Snowflake metrics, with a local fallback mode if the OpenAI API is unavailable.
+Example request:
 
-The Streamlit dashboard includes an `AI Copilot` tab that calls this endpoint and renders explanations, impacted segments, recommendations, detailed insights, and follow-up questions.
+```json
+{
+  "question": "Why is churn increasing?"
+}
+```
 
-## Machine Learning
+The copilot returns:
 
-The reorder model is trained on a time-aware dataset to reduce target leakage. For each training row, customer features are calculated from prior orders only, while the label indicates whether the next target order contains at least one reordered item.
+- AI source indicator
+- summary
+- explanation
+- impacted segments
+- recommendations
+- detailed insights
+- follow-up questions
+- charts in the Streamlit dashboard
 
-Current model artifacts:
+## Dashboard
 
-- Model: `ml/artifacts/random_forest_reorder_model.joblib`
-- Metrics: `ml/artifacts/training_metrics.json`
-- Feature importance: `ml/artifacts/feature_importance.csv`
+The Streamlit dashboard includes:
 
-Current validation metrics:
+- Project Overview
+- KPIs
+- Customer Insights
+- Product Trends
+- Model Performance
+- AI Copilot
+
+The AI Copilot tab supports questions such as:
 
 ```text
-Accuracy: 0.615
-Precision: 0.963
-Recall: 0.612
-F1: 0.748
-ROC AUC: 0.682
+Why is churn increasing?
+Which products drive repeat purchases?
+Which customer segment has the longest days between orders?
+How does retention change by cohort period?
+How can we improve retention?
 ```
 
 ## Local Setup
@@ -237,19 +313,20 @@ Optional:
 
 ```text
 OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4o-mini
 MODEL_PATH=ml/artifacts/random_forest_reorder_model.joblib
 API_BASE_URL=http://localhost:8000
 ```
 
 ## Running Locally
 
-### Load raw data
+Load raw data:
 
 ```bash
 python -m ingestion.load_data
 ```
 
-### Run dbt
+Run dbt:
 
 ```bash
 cd transformations/dbt
@@ -258,25 +335,25 @@ dbt run --profiles-dir .
 dbt test --profiles-dir .
 ```
 
-### Run data validation
+Run data validation:
 
 ```bash
 python -m data_quality.validation
 ```
 
-### Train the model
+Train the model:
 
 ```bash
 python -m ml.train_model
 ```
 
-### Run the API
+Run the API:
 
 ```bash
 uvicorn api.main:app --reload
 ```
 
-### Run the dashboard
+Run the dashboard:
 
 ```bash
 streamlit run dashboard/app.py
@@ -288,40 +365,42 @@ streamlit run dashboard/app.py
 
 The FastAPI service is deployed on Render using `Dockerfile` and `render.yaml`.
 
-Required environment variables:
+Required production environment variables:
 
-- `APP_ENV=production`
-- `LOG_LEVEL=INFO`
-- `SNOWFLAKE_ACCOUNT`
-- `SNOWFLAKE_USER`
-- `SNOWFLAKE_PASSWORD`
-- `SNOWFLAKE_ROLE`
-- `SNOWFLAKE_WAREHOUSE`
-- `SNOWFLAKE_DATABASE`
-- `SNOWFLAKE_SCHEMA`
-- `OPENAI_API_KEY`
-- `MODEL_PATH=ml/artifacts/random_forest_reorder_model.joblib`
+```text
+APP_ENV=production
+LOG_LEVEL=INFO
+SNOWFLAKE_ACCOUNT
+SNOWFLAKE_USER
+SNOWFLAKE_PASSWORD
+SNOWFLAKE_ROLE
+SNOWFLAKE_WAREHOUSE
+SNOWFLAKE_DATABASE
+SNOWFLAKE_SCHEMA
+OPENAI_API_KEY
+OPENAI_MODEL
+MODEL_PATH=ml/artifacts/random_forest_reorder_model.joblib
+```
 
 ### Streamlit Cloud
 
-The dashboard is deployed on Streamlit Cloud.
-
 Configuration:
 
-- Main file path: `dashboard/app.py`
-- Python version: `3.11`
-- Dependencies: `dashboard/requirements.txt`
-- Secrets: values from `.streamlit/secrets.toml.example`
-- `API_BASE_URL` must point to the deployed Render API for the AI Copilot tab
+```text
+Main file: dashboard/app.py
+Python version: 3.11
+Dependencies: dashboard/requirements.txt
+API_BASE_URL: deployed Render API URL
+```
 
 ## CI/CD
 
 GitHub Actions runs on push and pull requests:
 
-- Install dependencies
-- Lint Python code with Ruff
-- Run Python tests
-- Validate the dbt project
+- install dependencies
+- lint Python code with Ruff
+- run Python tests
+- validate the dbt project
 
 Workflow file:
 
@@ -332,25 +411,26 @@ Workflow file:
 ## Security Notes
 
 - Never commit `.env` files or credentials.
-- Rotate Snowflake credentials if they are exposed in screenshots, logs, or chat.
 - Store production secrets in Render, Streamlit Cloud, and GitHub repository secrets.
-- Keep raw data out of Git unless it is intentionally sampled and anonymized.
+- Rotate Snowflake, OpenAI, and Kaggle credentials if they are exposed in screenshots, logs, or chat.
+- Keep raw data out of Git unless it is intentionally sampled and safe to share.
 
-## Portfolio Value
+## Limitations
 
-This project demonstrates practical production data engineering skills:
-
-- Warehouse-first modeling with Snowflake and dbt
-- Python ingestion with batching, logging, and error handling
-- ML feature engineering and model serving
-- API and dashboard deployment
-- CI/CD and deployment configuration
-- Data validation and operational monitoring patterns
+- Revenue is represented as a proxy because the Instacart dataset does not include product prices.
+- The model uses historical behavioral features and should not be interpreted as real-time customer intent.
+- Airflow and Kafka are included as production-style scaffolding, not hosted services in the current deployment.
+- The model artifact is committed for portfolio deployment simplicity. A production system should use object storage or a model registry.
+- OpenAI responses are grounded in aggregate Snowflake metrics and do not have unrestricted SQL execution.
 
 ## Future Improvements
 
-- Store trained model artifacts in Snowflake stage or object storage instead of Git
-- Add API authentication
+- Store model artifacts in Snowflake stage, S3, or a model registry
+- Add API authentication and rate limiting
 - Add historical model evaluation tracking
-- Add richer dashboard filters and drill-downs
-- Add Airflow deployment with a managed scheduler
+- Add model drift monitoring
+- Add richer dashboard filters by cohort, product department, and customer segment
+- Deploy Airflow as a managed scheduler
+- Add real-time scoring from Kafka events
+- Add screenshots to the README
+
