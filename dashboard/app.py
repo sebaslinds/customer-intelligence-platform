@@ -4,8 +4,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import altair as alt
 import pandas as pd
-import plotly.express as px
 import requests
 import streamlit as st
 from sqlalchemy import text
@@ -628,32 +628,26 @@ def render_bar_chart(
     if frame.empty:
         return
 
-    chart = px.bar(
-        frame,
-        x=x_column,
-        y=y_column,
-        text_auto=True,
-        title=title,
-        color_discrete_sequence=["#2563eb"],
+    tooltip = [
+        alt.Tooltip(f"{x_column}:N", title=x_column.replace("_", " ").title()),
+        alt.Tooltip(f"{y_column}:Q", title=(y_title or y_column).replace("_", " ").title(), format=",.2f"),
+    ]
+    bars = (
+        alt.Chart(frame)
+        .mark_bar(color="#2563eb", cornerRadiusTopLeft=3, cornerRadiusTopRight=3)
+        .encode(
+            x=alt.X(
+                f"{x_column}:N",
+                sort=None,
+                axis=alt.Axis(labelAngle=x_tick_angle, labelLimit=180, title=None),
+            ),
+            y=alt.Y(f"{y_column}:Q", axis=alt.Axis(title=y_title), scale=alt.Scale(zero=True)),
+            tooltip=tooltip,
+        )
     )
-    chart.update_traces(
-        textposition="outside",
-        hovertemplate="<b>%{x}</b><br>%{y}<extra></extra>",
-        marker_line_width=0,
-    )
-    chart.update_layout(
-        height=height,
-        margin={"l": 10, "r": 10, "t": 45 if title else 15, "b": 95},
-        xaxis_title=None,
-        yaxis_title=y_title,
-        showlegend=False,
-        font={"family": "Inter, Segoe UI, sans-serif", "size": 13},
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)",
-    )
-    chart.update_xaxes(tickangle=x_tick_angle, automargin=True)
-    chart.update_yaxes(gridcolor="rgba(148, 163, 184, 0.22)", rangemode="tozero")
-    st.plotly_chart(chart, use_container_width=True, config={"displayModeBar": False})
+    labels = bars.mark_text(dy=-8, color="#475569").encode(text=alt.Text(f"{y_column}:Q", format=",.0f"))
+    chart = (bars + labels).properties(title=title, height=height)
+    st.altair_chart(chart, use_container_width=True)
 
 
 def parse_metric_value(value: Any) -> float | None:
@@ -888,27 +882,23 @@ def render_customer_insights(frame: pd.DataFrame) -> None:
         var_name="metric",
         value_name="value",
     )
-    chart = px.bar(
-        chart_data,
-        x="user_id",
-        y="value",
-        color="metric",
-        barmode="group",
-        text_auto=True,
-        color_discrete_sequence=["#2563eb", "#38bdf8"],
+    chart = (
+        alt.Chart(chart_data)
+        .mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3)
+        .encode(
+            x=alt.X("user_id:N", axis=alt.Axis(labelAngle=-25, labelLimit=120, title=None)),
+            xOffset="metric:N",
+            y=alt.Y("value:Q", axis=alt.Axis(title=None), scale=alt.Scale(zero=True)),
+            color=alt.Color("metric:N", scale=alt.Scale(range=["#2563eb", "#38bdf8"]), legend=alt.Legend(title=None)),
+            tooltip=[
+                alt.Tooltip("user_id:N", title="User ID"),
+                alt.Tooltip("metric:N", title="Metric"),
+                alt.Tooltip("value:Q", title="Value", format=",.0f"),
+            ],
+        )
+        .properties(height=380)
     )
-    chart.update_layout(
-        height=380,
-        margin={"l": 10, "r": 10, "t": 15, "b": 90},
-        xaxis_title=None,
-        yaxis_title=None,
-        legend_title=None,
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)",
-    )
-    chart.update_xaxes(tickangle=-25, automargin=True)
-    chart.update_yaxes(gridcolor="rgba(148, 163, 184, 0.22)", rangemode="tozero")
-    st.plotly_chart(chart, use_container_width=True, config={"displayModeBar": False})
+    st.altair_chart(chart, use_container_width=True)
 
     st.dataframe(
         frame,
