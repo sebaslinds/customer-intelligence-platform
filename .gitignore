@@ -28,6 +28,9 @@ data/processed/
 logs/
 *.log
 ml/artifacts/
+!ml/artifacts/
+ml/artifacts/*
+!ml/artifacts/random_forest_reorder_model.joblib
 
 # dbt
 transformations/dbt/target/
