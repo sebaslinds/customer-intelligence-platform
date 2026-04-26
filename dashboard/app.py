@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+import requests
 import streamlit as st
 from sqlalchemy import text
 
@@ -24,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 MODEL_METRICS_PATH = PROJECT_ROOT / "ml" / "artifacts" / "training_metrics.json"
 FEATURE_IMPORTANCE_PATH = PROJECT_ROOT / "ml" / "artifacts" / "feature_importance.csv"
+COPILOT_TIMEOUT_SECONDS = 60
 
 
 st.set_page_config(
@@ -109,6 +111,17 @@ def load_feature_importance() -> pd.DataFrame:
         return pd.DataFrame(columns=["feature", "importance"])
 
     return pd.read_csv(FEATURE_IMPORTANCE_PATH)
+
+
+def request_copilot_insights(question: str) -> dict[str, Any]:
+    api_base_url = settings.api_base_url.rstrip("/")
+    response = requests.post(
+        f"{api_base_url}/copilot/insights",
+        json={"question": question},
+        timeout=COPILOT_TIMEOUT_SECONDS,
+    )
+    response.raise_for_status()
+    return response.json()
 
 
 def format_number(value: Any) -> str:
@@ -236,11 +249,105 @@ def render_model_performance(metrics: dict[str, Any], feature_importance: pd.Dat
         )
 
 
+def render_copilot_response(response: dict[str, Any]) -> None:
+    if summary := response.get("summary"):
+        st.markdown(f"**Summary:** {summary}")
+    if explanation := response.get("explanation"):
+        st.write(explanation)
+
+    impacted_segments = response.get("impacted_segments") or []
+    if impacted_segments:
+        st.markdown("**Impacted Segments**")
+        st.dataframe(pd.DataFrame(impacted_segments), use_container_width=True, hide_index=True)
+
+    recommendations = response.get("recommendations") or []
+    if recommendations:
+        st.markdown("**Recommendations**")
+        for recommendation in recommendations:
+            priority = recommendation.get("priority", "medium")
+            action = recommendation.get("action", "")
+            expected_impact = recommendation.get("expected_impact", "")
+            st.markdown(f"- **{priority.upper()}**: {action}  \n  {expected_impact}")
+
+    insights = response.get("insights") or []
+    if insights:
+        with st.expander("Detailed Insights"):
+            for insight in insights:
+                st.markdown(f"**{insight.get('title', 'Insight')}**")
+                st.write(insight.get("finding", ""))
+                evidence = insight.get("evidence") or []
+                if evidence:
+                    st.caption("Evidence: " + " | ".join(str(item) for item in evidence))
+
+    follow_up_questions = response.get("follow_up_questions") or []
+    if follow_up_questions:
+        st.caption("Follow-up questions: " + " | ".join(follow_up_questions))
+
+
+def render_ai_copilot() -> None:
+    st.subheader("AI Business Copilot")
+    st.caption("Ask business questions about churn, reorders, products, retention, and customer behavior.")
+
+    if "copilot_messages" not in st.session_state:
+        st.session_state.copilot_messages = [
+            {
+                "role": "assistant",
+                "content": "Ask me about churn, reorder trends, top products, retention, or customer segments.",
+            }
+        ]
+
+    examples = [
+        "Why is churn increasing?",
+        "What products drive repeat purchases?",
+        "Which customer segments are at churn risk?",
+        "How can we improve retention?",
+    ]
+    selected_example = st.selectbox("Example questions", [""] + examples)
+    if selected_example and st.button("Ask example"):
+        st.session_state.pending_copilot_question = selected_example
+
+    for message in st.session_state.copilot_messages:
+        with st.chat_message(message["role"]):
+            content = message.get("content")
+            if isinstance(content, dict):
+                render_copilot_response(content)
+            else:
+                st.write(content)
+
+    question = st.chat_input("Ask for AI insights")
+    pending_question = st.session_state.pop("pending_copilot_question", None)
+    question = question or pending_question
+    if not question:
+        return
+
+    st.session_state.copilot_messages.append({"role": "user", "content": question})
+    with st.chat_message("user"):
+        st.write(question)
+
+    with st.chat_message("assistant"):
+        with st.spinner("Generating insights from Snowflake metrics..."):
+            try:
+                response = request_copilot_insights(question)
+            except requests.RequestException as exc:
+                logger.exception("Copilot API request failed")
+                error_message = (
+                    "Unable to reach the copilot API. Check API_BASE_URL and the Render service status."
+                )
+                st.error(error_message)
+                st.caption(str(exc))
+                st.session_state.copilot_messages.append({"role": "assistant", "content": error_message})
+                return
+
+        render_copilot_response(response)
+        st.session_state.copilot_messages.append({"role": "assistant", "content": response})
+
+
 def render_sidebar() -> None:
     st.sidebar.header("Controls")
     st.sidebar.write(f"Environment: `{settings.app_env}`")
     st.sidebar.write(f"Database: `{settings.snowflake_database or 'not configured'}`")
     st.sidebar.write(f"Schema: `{settings.snowflake_schema or 'not configured'}`")
+    st.sidebar.write(f"API: `{settings.api_base_url}`")
     if st.sidebar.button("Refresh data"):
         st.cache_data.clear()
         st.rerun()
@@ -265,13 +372,17 @@ def main() -> None:
     render_kpis(kpis)
     st.divider()
 
-    customer_tab, product_tab, model_tab = st.tabs(["Customer Insights", "Product Trends", "Model Performance"])
+    customer_tab, product_tab, model_tab, copilot_tab = st.tabs(
+        ["Customer Insights", "Product Trends", "Model Performance", "AI Copilot"]
+    )
     with customer_tab:
         render_customer_insights(customers)
     with product_tab:
         render_product_trends(products)
     with model_tab:
         render_model_performance(model_metrics, feature_importance)
+    with copilot_tab:
+        render_ai_copilot()
 
 
 if __name__ == "__main__":

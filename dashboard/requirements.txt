@@ -7,3 +7,4 @@ snowflake-sqlalchemy==1.7.3
 SQLAlchemy==2.0.36
 cryptography==44.0.0
 pyOpenSSL==24.3.0
+requests==2.32.3

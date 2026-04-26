@@ -19,6 +19,7 @@ The project ingests Instacart-style customer order data, models it in Snowflake 
 - Random Forest reorder prediction model
 - FastAPI prediction and AI copilot endpoints
 - Streamlit dashboard connected directly to Snowflake
+- Dashboard chatbot for AI-generated business insights
 - Structured logging and pipeline metrics
 - GitHub Actions CI for linting, tests, and dbt validation
 - Deployment-ready configuration for Render and Streamlit Cloud
@@ -155,6 +156,8 @@ POST /copilot/insights
 
 Generates structured business insights from Snowflake metrics, with a local fallback mode if the OpenAI API is unavailable.
 
+The Streamlit dashboard includes an `AI Copilot` tab that calls this endpoint and renders explanations, impacted segments, recommendations, detailed insights, and follow-up questions.
+
 ## Machine Learning
 
 The reorder model is trained on a time-aware dataset to reduce target leakage. For each training row, customer features are calculated from prior orders only, while the label indicates whether the next target order contains at least one reordered item.
@@ -235,6 +238,7 @@ Optional:
 ```text
 OPENAI_API_KEY=
 MODEL_PATH=ml/artifacts/random_forest_reorder_model.joblib
+API_BASE_URL=http://localhost:8000
 ```
 
 ## Running Locally
@@ -308,6 +312,7 @@ Configuration:
 - Python version: `3.11`
 - Dependencies: `dashboard/requirements.txt`
 - Secrets: values from `.streamlit/secrets.toml.example`
+- `API_BASE_URL` must point to the deployed Render API for the AI Copilot tab
 
 ## CI/CD
 
