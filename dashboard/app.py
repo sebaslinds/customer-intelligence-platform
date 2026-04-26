@@ -124,6 +124,11 @@ def request_copilot_insights(question: str) -> dict[str, Any]:
     return response.json()
 
 
+def queue_copilot_question(question: str) -> None:
+    st.session_state.pending_copilot_question = question
+    st.rerun()
+
+
 def format_number(value: Any) -> str:
     if pd.isna(value):
         return "0"
@@ -249,7 +254,7 @@ def render_model_performance(metrics: dict[str, Any], feature_importance: pd.Dat
         )
 
 
-def render_copilot_response(response: dict[str, Any]) -> None:
+def render_copilot_response(response: dict[str, Any], message_index: int | None = None) -> None:
     if summary := response.get("summary"):
         st.markdown(f"**Summary:** {summary}")
     if explanation := response.get("explanation"):
@@ -281,7 +286,12 @@ def render_copilot_response(response: dict[str, Any]) -> None:
 
     follow_up_questions = response.get("follow_up_questions") or []
     if follow_up_questions:
-        st.caption("Follow-up questions: " + " | ".join(follow_up_questions))
+        st.markdown("**Follow-up questions**")
+        for index, follow_up_question in enumerate(follow_up_questions):
+            key_parts = ["follow_up", str(message_index if message_index is not None else "live"), str(index)]
+            button_key = "_".join(key_parts)
+            if st.button(follow_up_question, key=button_key):
+                queue_copilot_question(follow_up_question)
 
 
 def render_ai_copilot() -> None:
@@ -302,15 +312,18 @@ def render_ai_copilot() -> None:
         "Which customer segments are at churn risk?",
         "How can we improve retention?",
     ]
-    selected_example = st.selectbox("Example questions", [""] + examples)
-    if selected_example and st.button("Ask example"):
-        st.session_state.pending_copilot_question = selected_example
+    st.markdown("**Quick prompts**")
+    prompt_columns = st.columns(2)
+    for index, example in enumerate(examples):
+        with prompt_columns[index % 2]:
+            if st.button(example, key=f"example_prompt_{index}"):
+                queue_copilot_question(example)
 
-    for message in st.session_state.copilot_messages:
+    for message_index, message in enumerate(st.session_state.copilot_messages):
         with st.chat_message(message["role"]):
             content = message.get("content")
             if isinstance(content, dict):
-                render_copilot_response(content)
+                render_copilot_response(content, message_index=message_index)
             else:
                 st.write(content)
 
@@ -338,8 +351,8 @@ def render_ai_copilot() -> None:
                 st.session_state.copilot_messages.append({"role": "assistant", "content": error_message})
                 return
 
-        render_copilot_response(response)
         st.session_state.copilot_messages.append({"role": "assistant", "content": response})
+        render_copilot_response(response, message_index=len(st.session_state.copilot_messages) - 1)
 
 
 def render_sidebar() -> None:
