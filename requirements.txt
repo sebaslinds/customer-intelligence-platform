@@ -8,6 +8,8 @@ streamlit==1.41.1
 snowflake-connector-python==3.12.4
 snowflake-sqlalchemy==1.7.3
 SQLAlchemy==2.0.36
+cryptography==44.0.0
+pyOpenSSL==24.3.0
 scikit-learn==1.6.0
 joblib==1.4.2
 pytest==8.3.4
