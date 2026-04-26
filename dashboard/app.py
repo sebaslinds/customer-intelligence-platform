@@ -44,6 +44,10 @@ TRANSLATIONS = {
         "refresh_data": "Refresh data",
         "kpis": "KPIs",
         "revenue_proxy": "Revenue Proxy",
+        "revenue_proxy_help": (
+            "Estimated business volume based on total items ordered. The Instacart dataset does not include "
+            "prices, so this is a directional revenue proxy, not actual sales."
+        ),
         "orders": "Orders",
         "reorder_rate": "Reorder Rate",
         "project_overview": "Project Overview",
@@ -158,6 +162,10 @@ TRANSLATIONS = {
         "refresh_data": "Rafraîchir les données",
         "kpis": "Indicateurs",
         "revenue_proxy": "Proxy De Revenus",
+        "revenue_proxy_help": (
+            "Estimation du volume business basee sur le nombre total d'articles commandes. Le dataset "
+            "Instacart ne contient pas les prix, donc ce KPI est un proxy directionnel, pas des ventes reelles."
+        ),
         "orders": "Commandes",
         "reorder_rate": "Taux de recommande",
         "project_overview": "Vue d'ensemble",
@@ -814,6 +822,7 @@ def render_kpis(kpis: dict[str, Any]) -> None:
     revenue_proxy, total_orders, reorder_rate = st.columns(3)
 
     revenue_proxy.metric(translate("revenue_proxy"), format_number(kpis.get("revenue_proxy", 0)))
+    revenue_proxy.caption(translate("revenue_proxy_help"))
     total_orders.metric(translate("orders"), format_number(kpis.get("total_orders", 0)))
     reorder_rate.metric(translate("reorder_rate"), format_percent(kpis.get("reorder_rate", 0)))
 
