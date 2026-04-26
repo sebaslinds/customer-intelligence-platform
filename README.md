@@ -53,6 +53,15 @@ On Windows PowerShell:
 pip install -r requirements.txt
 ```
 
+Optional workflow-specific dependencies are split out to keep lightweight deployments, such as Streamlit Cloud, from installing services they do not need:
+
+```bash
+pip install -r requirements-dbt.txt
+pip install -r requirements-ingestion.txt
+pip install -r requirements-streaming.txt
+pip install -r requirements-data-quality.txt
+```
+
 ### 3. Configure environment variables
 
 Copy the example file and fill in your Snowflake credentials:
@@ -129,6 +138,7 @@ Deploy the dashboard with:
 
 - Main file path: `dashboard/app.py`
 - Python dependencies: `requirements.txt`
+- Python runtime: `.python-version` pins Python 3.11
 - Secrets: copy values from `.streamlit/secrets.toml.example` into Streamlit Cloud secrets
 
 Streamlit Cloud exposes secrets as environment variables, which are read by the shared settings layer.

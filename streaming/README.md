@@ -2,6 +2,12 @@
 
 This folder contains a simple real-time order event pipeline.
 
+Install the Kafka-specific dependency before running the producer or consumer:
+
+```bash
+pip install -r requirements-streaming.txt
+```
+
 ## Producer
 
 Simulates JSON order events and publishes them to Kafka:

@@ -4,15 +4,10 @@ pydantic-settings==2.7.1
 python-dotenv==1.0.1
 openai==1.59.7
 pandas==2.2.3
-kaggle==1.6.17
 streamlit==1.41.1
-confluent-kafka==2.6.1
 snowflake-connector-python==3.12.4
 snowflake-sqlalchemy==1.7.3
 SQLAlchemy==2.0.36
-dbt-core==1.8.9
-dbt-snowflake==1.8.4
-great-expectations==0.18.22
 scikit-learn==1.6.0
 joblib==1.4.2
 pytest==8.3.4
