@@ -1,5 +1,6 @@
 import json
 import logging
+import html
 import sys
 from pathlib import Path
 from typing import Any
@@ -745,21 +746,37 @@ def format_priority_label(priority: str) -> str:
     return labels.get(priority.lower(), priority.upper())
 
 
+def render_card_value(value: str) -> None:
+    escaped_value = html.escape(value)
+    st.markdown(
+        (
+            "<div style='font-size:2rem;line-height:1.15;font-weight:650;"
+            "overflow-wrap:anywhere;margin:0.35rem 0 0.9rem 0;'>"
+            f"{escaped_value}"
+            "</div>"
+        ),
+        unsafe_allow_html=True,
+    )
+
+
 def render_segment_cards(segments: list[dict[str, Any]]) -> None:
     for row_start in range(0, len(segments), 3):
-        columns = st.columns(3)
-        for column, segment in zip(columns, segments[row_start : row_start + 3], strict=False):
+        row_segments = segments[row_start : row_start + 3]
+        columns = st.columns(len(row_segments))
+        for column, segment in zip(columns, row_segments, strict=False):
             with column.container(border=True):
                 st.caption(str(segment.get("metric") or "metric").replace("_", " ").title())
-                st.metric(str(segment.get("segment_name") or "Segment"), format_segment_metric_value(segment))
+                st.markdown(f"**{segment.get('segment_name') or 'Segment'}**")
+                render_card_value(format_segment_metric_value(segment))
                 if reason := segment.get("why_it_matters"):
-                    st.caption(str(reason))
+                    st.write(str(reason))
 
 
 def render_recommendation_cards(recommendations: list[dict[str, Any]]) -> None:
     for row_start in range(0, len(recommendations), 2):
-        columns = st.columns(2)
-        for column, recommendation in zip(columns, recommendations[row_start : row_start + 2], strict=False):
+        row_recommendations = recommendations[row_start : row_start + 2]
+        columns = st.columns(len(row_recommendations))
+        for column, recommendation in zip(columns, row_recommendations, strict=False):
             priority = str(recommendation.get("priority") or "medium")
             with column.container(border=True):
                 st.caption(format_priority_label(priority))
