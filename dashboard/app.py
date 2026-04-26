@@ -141,6 +141,62 @@ def format_percent(value: Any) -> str:
     return f"{float(value):.1%}"
 
 
+def parse_metric_value(value: Any) -> float | None:
+    if value is None or isinstance(value, dict | list | tuple):
+        return None
+
+    text_value = str(value).strip().replace(",", "")
+    if not text_value:
+        return None
+
+    if text_value.endswith("%"):
+        text_value = text_value[:-1].strip()
+
+    try:
+        return float(text_value)
+    except ValueError:
+        return None
+
+
+def build_segments_chart_frame(segments: list[dict[str, Any]]) -> pd.DataFrame:
+    chart_rows = []
+    for segment in segments:
+        metric_value = parse_metric_value(segment.get("value"))
+        if metric_value is None:
+            continue
+
+        segment_name = str(segment.get("segment_name") or "segment")
+        metric = str(segment.get("metric") or "metric")
+        chart_rows.append(
+            {
+                "segment": f"{segment_name} | {metric}",
+                "value": metric_value,
+            }
+        )
+
+    return pd.DataFrame(chart_rows)
+
+
+def build_recommendation_priority_frame(recommendations: list[dict[str, Any]]) -> pd.DataFrame:
+    priorities = [
+        str(recommendation.get("priority") or "medium").lower()
+        for recommendation in recommendations
+        if isinstance(recommendation, dict)
+    ]
+    if not priorities:
+        return pd.DataFrame(columns=["priority", "count"])
+
+    priority_order = {"high": 3, "medium": 2, "low": 1}
+    priority_frame = (
+        pd.Series(priorities, name="priority")
+        .value_counts()
+        .rename_axis("priority")
+        .reset_index(name="count")
+    )
+    priority_frame["sort_order"] = priority_frame["priority"].map(priority_order).fillna(0)
+    return priority_frame.sort_values("sort_order", ascending=False).drop(columns="sort_order")
+
+
 def render_header() -> None:
     st.title("Customer Intelligence Platform")
     st.caption("Snowflake-powered customer, order, and product intelligence")
@@ -263,7 +319,17 @@ def render_copilot_response(response: dict[str, Any], message_index: int | None 
     impacted_segments = response.get("impacted_segments") or []
     if impacted_segments:
         st.markdown("**Impacted Segments**")
-        st.dataframe(pd.DataFrame(impacted_segments), use_container_width=True, hide_index=True)
+        segment_frame = pd.DataFrame(impacted_segments)
+        chart_frame = build_segments_chart_frame(impacted_segments)
+        if chart_frame.empty:
+            st.dataframe(segment_frame, use_container_width=True, hide_index=True)
+        else:
+            table_column, chart_column = st.columns([1.35, 1])
+            with table_column:
+                st.dataframe(segment_frame, use_container_width=True, hide_index=True)
+            with chart_column:
+                st.caption("Metric comparison")
+                st.bar_chart(chart_frame.set_index("segment")["value"])
 
     recommendations = response.get("recommendations") or []
     if recommendations:
@@ -273,6 +339,11 @@ def render_copilot_response(response: dict[str, Any], message_index: int | None 
             action = recommendation.get("action", "")
             expected_impact = recommendation.get("expected_impact", "")
             st.markdown(f"- **{priority.upper()}**: {action}  \n  {expected_impact}")
+
+        priority_frame = build_recommendation_priority_frame(recommendations)
+        if not priority_frame.empty:
+            st.caption("Recommendation priority mix")
+            st.bar_chart(priority_frame.set_index("priority")["count"])
 
     insights = response.get("insights") or []
     if insights:
