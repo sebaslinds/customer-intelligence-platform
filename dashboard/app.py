@@ -26,6 +26,8 @@ logger = logging.getLogger(__name__)
 MODEL_METRICS_PATH = PROJECT_ROOT / "ml" / "artifacts" / "training_metrics.json"
 FEATURE_IMPORTANCE_PATH = PROJECT_ROOT / "ml" / "artifacts" / "feature_importance.csv"
 COPILOT_TIMEOUT_SECONDS = 60
+STREAMLIT_APP_URL = "https://customer-intelligence-platform-d2pmcjetsrlgm2zwep7vgf.streamlit.app/"
+RENDER_API_URL = "https://customer-intelligence-platform-3v6q.onrender.com"
 
 
 st.set_page_config(
@@ -212,6 +214,69 @@ def render_ai_source(response: dict[str, Any]) -> None:
 def render_header() -> None:
     st.title("Customer Intelligence Platform")
     st.caption("Snowflake-powered customer, order, and product intelligence")
+
+
+def render_project_overview() -> None:
+    st.subheader("Project Overview")
+    st.write(
+        "A production-style customer intelligence platform that turns Instacart order data into "
+        "analytics marts, machine learning predictions, business dashboards, and AI-generated insights."
+    )
+
+    objective_column, capabilities_column = st.columns(2)
+    with objective_column:
+        st.markdown("**Business Objective**")
+        st.write(
+            "Help retail teams understand reorder behavior, identify churn risk, prioritize retention "
+            "actions, and surface product trends from customer purchase history."
+        )
+    with capabilities_column:
+        st.markdown("**Key Capabilities**")
+        st.write(
+            "Batch ingestion, Snowflake warehouse modeling, dbt transformations, feature engineering, "
+            "RandomForest scoring, FastAPI predictions, Streamlit analytics, and OpenAI copilot insights."
+        )
+
+    st.markdown("**Architecture**")
+    architecture_steps = pd.DataFrame(
+        [
+            {"step": "1", "layer": "Data Source", "component": "Instacart CSV files"},
+            {"step": "2", "layer": "Ingestion", "component": "Python, pandas, Snowflake connector"},
+            {"step": "3", "layer": "Warehouse", "component": "Snowflake raw, staging, and mart tables"},
+            {"step": "4", "layer": "Transformations", "component": "dbt staging, facts, dimensions, feature store"},
+            {"step": "5", "layer": "Machine Learning", "component": "scikit-learn RandomForest model"},
+            {"step": "6", "layer": "Serving", "component": "FastAPI deployed on Render"},
+            {"step": "7", "layer": "Experience", "component": "Streamlit Cloud dashboard and AI copilot"},
+        ]
+    )
+    st.dataframe(architecture_steps, use_container_width=True, hide_index=True)
+
+    st.markdown("**Tech Stack**")
+    stack_frame = pd.DataFrame(
+        [
+            {"area": "Backend", "tools": "Python, FastAPI, Pydantic"},
+            {"area": "Data Warehouse", "tools": "Snowflake"},
+            {"area": "Transformations", "tools": "dbt"},
+            {"area": "Machine Learning", "tools": "pandas, scikit-learn, joblib"},
+            {"area": "Dashboard", "tools": "Streamlit"},
+            {"area": "AI", "tools": "OpenAI API with Snowflake context"},
+            {"area": "Deployment", "tools": "Render, Streamlit Cloud, GitHub Actions"},
+        ]
+    )
+    st.dataframe(stack_frame, use_container_width=True, hide_index=True)
+
+    st.markdown("**Live Services**")
+    dashboard_url, api_docs_url, health_url = st.columns(3)
+    dashboard_url.link_button("Dashboard", STREAMLIT_APP_URL, use_container_width=True)
+    api_docs_url.link_button("API Docs", f"{RENDER_API_URL}/docs", use_container_width=True)
+    health_url.link_button("Health Check", f"{RENDER_API_URL}/health", use_container_width=True)
+
+    st.markdown("**Portfolio Notes**")
+    st.info(
+        "Revenue is represented as a proxy because the Instacart dataset does not include prices. "
+        "The AI copilot is grounded in aggregate Snowflake metrics and includes a local fallback mode "
+        "for resilience when OpenAI is unavailable."
+    )
 
 
 def render_kpis(kpis: dict[str, Any]) -> None:
@@ -470,9 +535,11 @@ def main() -> None:
     render_kpis(kpis)
     st.divider()
 
-    customer_tab, product_tab, model_tab, copilot_tab = st.tabs(
-        ["Customer Insights", "Product Trends", "Model Performance", "AI Copilot"]
+    overview_tab, customer_tab, product_tab, model_tab, copilot_tab = st.tabs(
+        ["Project Overview", "Customer Insights", "Product Trends", "Model Performance", "AI Copilot"]
     )
+    with overview_tab:
+        render_project_overview()
     with customer_tab:
         render_customer_insights(customers)
     with product_tab:
