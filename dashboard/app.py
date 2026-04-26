@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 MODEL_METRICS_PATH = PROJECT_ROOT / "ml" / "artifacts" / "training_metrics.json"
 FEATURE_IMPORTANCE_PATH = PROJECT_ROOT / "ml" / "artifacts" / "feature_importance.csv"
 COPILOT_TIMEOUT_SECONDS = 60
+API_HEALTH_TIMEOUT_SECONDS = 45
 STREAMLIT_APP_URL = "https://customer-intelligence-platform-d2pmcjetsrlgm2zwep7vgf.streamlit.app/"
 RENDER_API_URL = "https://customer-intelligence-platform-3v6q.onrender.com"
 
@@ -284,9 +285,17 @@ def load_snowflake_connection_health() -> dict[str, Any]:
 
 def load_api_health() -> dict[str, Any]:
     api_base_url = settings.api_base_url.rstrip("/")
-    response = requests.get(f"{api_base_url}/health", timeout=10)
+    response = requests.get(f"{api_base_url}/health", timeout=API_HEALTH_TIMEOUT_SECONDS)
     response.raise_for_status()
     return response.json()
+
+
+def format_api_health_detail(api_detail: dict[str, Any]) -> str:
+    if error := api_detail.get("error"):
+        return str(error)
+    if "model_loaded" in api_detail:
+        return f"model_loaded={api_detail.get('model_loaded')}"
+    return "No health payload returned"
 
 
 @st.cache_data(show_spinner=False)
@@ -624,7 +633,7 @@ def render_pipeline_health() -> None:
         {
             "component": "Render API",
             "status": api_status,
-            "detail": f"model_loaded={api_detail.get('model_loaded')}" if api_detail else "",
+            "detail": format_api_health_detail(api_detail),
         },
         {
             "component": "Model artifact",
