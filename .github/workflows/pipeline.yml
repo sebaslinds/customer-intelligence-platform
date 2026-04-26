@@ -63,6 +63,7 @@ jobs:
           SNOWFLAKE_DATABASE: ${{ secrets.SNOWFLAKE_DATABASE }}
           SNOWFLAKE_SCHEMA: ${{ secrets.SNOWFLAKE_SCHEMA }}
         run: |
+          cp profiles.yml.example profiles.yml
           dbt deps --profiles-dir .
           dbt test --profiles-dir .
 

@@ -11,10 +11,10 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from config.logging_config import configure_logging
-from config.production import validate_production_settings
-from config.settings import get_settings
-from ingestion.snowflake_client import build_snowflake_engine
+from config.logging_config import configure_logging  # noqa: E402
+from config.production import validate_production_settings  # noqa: E402
+from config.settings import get_settings  # noqa: E402
+from ingestion.snowflake_client import build_snowflake_engine  # noqa: E402
 
 settings = get_settings()
 validate_production_settings(settings)
