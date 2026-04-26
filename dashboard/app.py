@@ -127,6 +127,9 @@ TRANSLATIONS = {
         "summary": "Summary",
         "impacted_segments": "Impacted Segments",
         "metric_comparison": "Metric comparison",
+        "segment_snapshot": "Segment snapshot",
+        "why_it_matters": "Why it matters",
+        "supporting_table": "Supporting table",
         "recommendations": "Recommendations",
         "priority_mix": "Recommendation priority mix",
         "detailed_insights": "Detailed Insights",
@@ -229,6 +232,9 @@ TRANSLATIONS = {
         "summary": "Résumé",
         "impacted_segments": "Segments impactés",
         "metric_comparison": "Comparaison des métriques",
+        "segment_snapshot": "Portrait des segments",
+        "why_it_matters": "Pourquoi c'est important",
+        "supporting_table": "Table de support",
         "recommendations": "Recommandations",
         "priority_mix": "Mix Des Priorites",
         "detailed_insights": "Insights détaillés",
@@ -610,7 +616,8 @@ def build_segments_chart_frame(segments: list[dict[str, Any]]) -> pd.DataFrame:
         metric = str(segment.get("metric") or "metric")
         chart_rows.append(
             {
-                "segment": f"{segment_name} | {metric}",
+                "segment": segment_name,
+                "metric": metric,
                 "value": metric_value,
             }
         )
@@ -636,6 +643,46 @@ def build_recommendation_priority_frame(recommendations: list[dict[str, Any]]) -
     )
     priority_frame["sort_order"] = priority_frame["priority"].map(priority_order).fillna(0)
     return priority_frame.sort_values("sort_order", ascending=False).drop(columns="sort_order")
+
+
+def format_segment_metric_value(segment: dict[str, Any]) -> str:
+    value = str(segment.get("value") or "0")
+    metric = str(segment.get("metric") or "")
+    if metric and metric not in value:
+        return f"{value}"
+    return value
+
+
+def format_priority_label(priority: str) -> str:
+    labels = {
+        "high": "HIGH" if get_language() == "en" else "ÉLEVÉ",
+        "medium": "MEDIUM" if get_language() == "en" else "MOYEN",
+        "low": "LOW" if get_language() == "en" else "FAIBLE",
+    }
+    return labels.get(priority.lower(), priority.upper())
+
+
+def render_segment_cards(segments: list[dict[str, Any]]) -> None:
+    for row_start in range(0, len(segments), 3):
+        columns = st.columns(3)
+        for column, segment in zip(columns, segments[row_start : row_start + 3], strict=False):
+            with column.container(border=True):
+                st.caption(str(segment.get("metric") or "metric").replace("_", " ").title())
+                st.metric(str(segment.get("segment_name") or "Segment"), format_segment_metric_value(segment))
+                if reason := segment.get("why_it_matters"):
+                    st.caption(str(reason))
+
+
+def render_recommendation_cards(recommendations: list[dict[str, Any]]) -> None:
+    for row_start in range(0, len(recommendations), 2):
+        columns = st.columns(2)
+        for column, recommendation in zip(columns, recommendations[row_start : row_start + 2], strict=False):
+            priority = str(recommendation.get("priority") or "medium")
+            with column.container(border=True):
+                st.caption(format_priority_label(priority))
+                st.markdown(f"**{recommendation.get('action', '')}**")
+                if expected_impact := recommendation.get("expected_impact"):
+                    st.write(expected_impact)
 
 
 def render_ai_source(response: dict[str, Any]) -> None:
@@ -971,7 +1018,9 @@ def render_copilot_response(response: dict[str, Any], message_index: int | None 
     render_ai_source(response)
 
     if summary := response.get("summary"):
-        st.markdown(f"**{translate('summary')}:** {summary}")
+        with st.container(border=True):
+            st.caption(translate("summary"))
+            st.markdown(f"**{summary}**")
     if explanation := response.get("explanation"):
         st.write(explanation)
 
@@ -979,25 +1028,20 @@ def render_copilot_response(response: dict[str, Any], message_index: int | None 
     if impacted_segments:
         st.markdown(f"**{translate('impacted_segments')}**")
         segment_frame = pd.DataFrame(impacted_segments)
+        render_segment_cards(impacted_segments)
+
         chart_frame = build_segments_chart_frame(impacted_segments)
-        if chart_frame.empty:
+        if not chart_frame.empty:
+            st.caption(translate("metric_comparison"))
+            st.bar_chart(chart_frame.set_index("segment")["value"])
+
+        with st.expander(translate("supporting_table")):
             st.dataframe(segment_frame, use_container_width=True, hide_index=True)
-        else:
-            table_column, chart_column = st.columns([1.35, 1])
-            with table_column:
-                st.dataframe(segment_frame, use_container_width=True, hide_index=True)
-            with chart_column:
-                st.caption(translate("metric_comparison"))
-                st.bar_chart(chart_frame.set_index("segment")["value"])
 
     recommendations = response.get("recommendations") or []
     if recommendations:
         st.markdown(f"**{translate('recommendations')}**")
-        for recommendation in recommendations:
-            priority = recommendation.get("priority", "medium")
-            action = recommendation.get("action", "")
-            expected_impact = recommendation.get("expected_impact", "")
-            st.markdown(f"- **{priority.upper()}**: {action}  \n  {expected_impact}")
+        render_recommendation_cards(recommendations)
 
         priority_frame = build_recommendation_priority_frame(recommendations)
         if not priority_frame.empty:
