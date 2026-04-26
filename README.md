@@ -137,8 +137,8 @@ uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000}
 Deploy the dashboard with:
 
 - Main file path: `dashboard/app.py`
-- Python dependencies: `requirements.txt`
-- Python runtime: `.python-version` pins Python 3.11
+- Python dependencies: `dashboard/requirements.txt`
+- Python runtime: select Python 3.11 in Streamlit Cloud advanced settings
 - Secrets: copy values from `.streamlit/secrets.toml.example` into Streamlit Cloud secrets
 
 Streamlit Cloud exposes secrets as environment variables, which are read by the shared settings layer.
