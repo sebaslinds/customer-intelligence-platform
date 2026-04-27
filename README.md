@@ -34,6 +34,7 @@ This project demonstrates how a modern data stack can convert raw transaction da
 - Advanced analytics marts for retention, churn probability, and customer lifetime value
 - RandomForest classification model for reorder prediction
 - FastAPI service with `/health`, `/predict`, and `/copilot/insights`
+- Decision Engine service with `/decision` for alerts and recommendations
 - Streamlit dashboard deployed on Streamlit Cloud
 - AI copilot powered by OpenAI and grounded in Snowflake metrics
 - Local fallback mode when OpenAI is unavailable
@@ -96,6 +97,7 @@ Detailed documentation:
 | API | FastAPI, Pydantic, Uvicorn |
 | Dashboard | Streamlit, Altair |
 | AI | OpenAI API |
+| Decision Intelligence | Rule engine, anomaly detection, Gemini explanations |
 | Data Quality | Great Expectations-inspired validation checks |
 | Orchestration | Apache Airflow DAG scaffold |
 | Streaming | Kafka producer and consumer scaffold |
@@ -238,6 +240,36 @@ The copilot returns:
 - follow-up questions
 - charts in the Streamlit dashboard
 
+### Decision Engine
+
+```http
+POST /decision
+```
+
+Example request:
+
+```json
+{
+  "data": {
+    "reorder_rate": 0.22,
+    "churn_rate": 0.61,
+    "days_between_orders": 24,
+    "data_quality_failures": 0
+  },
+  "anomalies": [],
+  "use_gemini": true
+}
+```
+
+The decision engine:
+
+- detects anomalies from incoming metrics
+- applies business decision rules
+- assigns priority levels: `low`, `medium`, `high`, `critical`
+- returns alerts and recommendations
+- uses Gemini for an executive explanation when `GEMINI_API_KEY` is configured
+- falls back to a deterministic local explanation when Gemini is unavailable
+
 ## Dashboard
 
 The Streamlit dashboard includes:
@@ -350,6 +382,8 @@ Optional:
 ```text
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-4o-mini
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-1.5-flash
 MODEL_PATH=ml/artifacts/random_forest_reorder_model.joblib
 API_BASE_URL=http://localhost:8000
 ```

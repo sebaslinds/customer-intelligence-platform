@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     model_path: str = "ml/artifacts/random_forest_reorder_model.joblib"
     openai_api_key: str | None = None
     openai_model: str = "gpt-4.1-mini"
+    gemini_api_key: str | None = None
+    gemini_model: str = "gemini-1.5-flash"
     kafka_bootstrap_servers: str = "localhost:9092"
     kafka_topic: str = "instacart.orders"
     kafka_consumer_group: str = "customer-intelligence-streaming"
