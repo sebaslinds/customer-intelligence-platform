@@ -159,6 +159,15 @@ TRANSLATIONS = {
         "decision_api_error": "Unable to reach the Decision Engine API. Check API_BASE_URL and Render service status.",
         "decision_explanation": "Decision Explanation",
         "explanation_source": "Explanation source",
+        "gemini_status": "Gemini status",
+        "gemini_requested": "Requested",
+        "gemini_configured": "Configured",
+        "gemini_yes": "Yes",
+        "gemini_no": "No",
+        "gemini_not_configured_help": (
+            "Gemini was requested, but the Render API does not have GEMINI_API_KEY configured. "
+            "Add it to the API service environment variables, then redeploy the API."
+        ),
         "detected_anomalies": "Detected Anomalies",
         "no_anomalies": "No anomalies detected for this scenario.",
         "priority_alerts": "Priority Alerts",
@@ -300,6 +309,15 @@ TRANSLATIONS = {
         "decision_api_error": "Impossible de joindre l'API Decision Engine. Verifie API_BASE_URL et le statut Render.",
         "decision_explanation": "Explication de la decision",
         "explanation_source": "Source de l'explication",
+        "gemini_status": "Statut Gemini",
+        "gemini_requested": "Demande",
+        "gemini_configured": "Configure",
+        "gemini_yes": "Oui",
+        "gemini_no": "Non",
+        "gemini_not_configured_help": (
+            "Gemini a ete demande, mais l'API Render n'a pas GEMINI_API_KEY configuree. "
+            "Ajoute-la dans les variables d'environnement du service API, puis redeploie l'API."
+        ),
         "detected_anomalies": "Anomalies detectees",
         "no_anomalies": "Aucune anomalie detectee pour ce scenario.",
         "priority_alerts": "Alertes prioritaires",
@@ -1471,6 +1489,29 @@ def render_decision_engine(kpis: dict[str, Any]) -> None:
     summary_columns[1].metric(translate("priority_alerts"), format_number(len(alerts)))
     summary_columns[2].metric(translate("decision_recommendations"), format_number(len(recommendations)))
     summary_columns[3].metric(translate("explanation_source"), str(response.get("explanation_source", "local_fallback")))
+
+    gemini_requested = bool(response.get("gemini_requested"))
+    gemini_configured = bool(response.get("gemini_configured"))
+    explanation_detail = response.get("explanation_detail")
+    with st.expander(translate("gemini_status"), expanded=gemini_requested):
+        status_frame = pd.DataFrame(
+            [
+                {
+                    translate("gemini_requested"): translate("gemini_yes")
+                    if gemini_requested
+                    else translate("gemini_no"),
+                    translate("gemini_configured"): translate("gemini_yes")
+                    if gemini_configured
+                    else translate("gemini_no"),
+                    translate("explanation_source"): response.get("explanation_source", "local_fallback"),
+                }
+            ]
+        )
+        st.dataframe(status_frame, use_container_width=True, hide_index=True)
+        if explanation_detail:
+            st.caption(str(explanation_detail))
+        if gemini_requested and not gemini_configured:
+            st.warning(translate("gemini_not_configured_help"))
 
     if explanation := response.get("explanation"):
         with st.container(border=True):

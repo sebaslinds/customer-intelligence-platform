@@ -1,3 +1,4 @@
+from config.settings import Settings
 from services.decision.engine import DecisionRequest, build_decisions, detect_anomalies, run_decision_engine
 
 
@@ -35,9 +36,33 @@ def test_decision_engine_uses_local_fallback_without_gemini() -> None:
                 "days_between_orders": 25,
             },
             use_gemini=False,
-        )
+        ),
+        settings=Settings(gemini_api_key=None),
     )
 
     assert response.explanation_source == "local_fallback"
+    assert response.gemini_requested is False
+    assert response.gemini_configured is False
+    assert response.explanation_detail == "Gemini was not requested for this run."
     assert response.decisions[0].priority == "high"
     assert response.anomalies
+
+
+def test_decision_engine_explains_missing_gemini_key() -> None:
+    response = run_decision_engine(
+        DecisionRequest(
+            data={
+                "reorder_rate": 0.20,
+                "churn_rate": 0.60,
+                "days_between_orders": 25,
+            },
+            use_gemini=True,
+        ),
+        settings=Settings(gemini_api_key=None),
+    )
+
+    assert response.explanation_source == "local_fallback"
+    assert response.gemini_requested is True
+    assert response.gemini_configured is False
+    assert response.explanation_detail is not None
+    assert "GEMINI_API_KEY" in response.explanation_detail

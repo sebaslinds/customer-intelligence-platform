@@ -39,6 +39,9 @@ class DecisionResponse(BaseModel):
     decisions: list[Decision]
     explanation: str
     explanation_source: Literal["gemini", "local_fallback"]
+    explanation_detail: str | None = None
+    gemini_requested: bool = False
+    gemini_configured: bool = False
     anomalies: list[Anomaly]
 
 
@@ -243,9 +246,9 @@ def explain_with_gemini(
     anomalies: list[Anomaly],
     decisions: list[Decision],
     settings: Settings,
-) -> str | None:
+) -> tuple[str | None, str | None]:
     if not settings.gemini_api_key:
-        return None
+        return None, "GEMINI_API_KEY is not configured on the API service."
 
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
@@ -275,13 +278,20 @@ def explain_with_gemini(
         candidates = body.get("candidates") or []
         parts = candidates[0].get("content", {}).get("parts", []) if candidates else []
         if parts and parts[0].get("text"):
-            return str(parts[0]["text"]).strip()
-    except requests.RequestException:
+            return str(parts[0]["text"]).strip(), f"Generated with {settings.gemini_model}."
+        return None, "Gemini returned no text in the response."
+    except requests.HTTPError as exc:
+        status_code = exc.response.status_code if exc.response is not None else "unknown"
         logger.exception("Gemini explanation request failed")
+        return None, f"Gemini request failed with HTTP status {status_code}."
+    except requests.RequestException as exc:
+        logger.exception("Gemini explanation request failed")
+        return None, f"Gemini request failed: {exc.__class__.__name__}."
     except (KeyError, IndexError, TypeError):
         logger.exception("Gemini response shape was unexpected")
+        return None, "Gemini returned an unexpected response shape."
 
-    return None
+    return None, "Gemini was requested but did not return text."
 
 
 def run_decision_engine(payload: DecisionRequest, settings: Settings | None = None) -> DecisionResponse:
@@ -291,9 +301,11 @@ def run_decision_engine(payload: DecisionRequest, settings: Settings | None = No
     decisions = build_decisions(payload.data, anomalies)
 
     explanation = None
+    explanation_detail = "Gemini was not requested for this run."
     explanation_source: Literal["gemini", "local_fallback"] = "local_fallback"
+    gemini_configured = bool(runtime_settings.gemini_api_key)
     if payload.use_gemini:
-        explanation = explain_with_gemini(payload.data, anomalies, decisions, runtime_settings)
+        explanation, explanation_detail = explain_with_gemini(payload.data, anomalies, decisions, runtime_settings)
         if explanation:
             explanation_source = "gemini"
 
@@ -301,5 +313,8 @@ def run_decision_engine(payload: DecisionRequest, settings: Settings | None = No
         decisions=decisions,
         explanation=explanation or build_local_explanation(decisions, anomalies),
         explanation_source=explanation_source,
+        explanation_detail=explanation_detail,
+        gemini_requested=payload.use_gemini,
+        gemini_configured=gemini_configured,
         anomalies=anomalies,
     )
