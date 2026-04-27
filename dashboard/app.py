@@ -29,6 +29,7 @@ MODEL_METRICS_PATH = PROJECT_ROOT / "ml" / "artifacts" / "training_metrics.json"
 FEATURE_IMPORTANCE_PATH = PROJECT_ROOT / "ml" / "artifacts" / "feature_importance.csv"
 COPILOT_TIMEOUT_SECONDS = 60
 API_HEALTH_TIMEOUT_SECONDS = 45
+DECISION_TIMEOUT_SECONDS = 45
 STREAMLIT_APP_URL = "https://customer-intelligence-platform-d2pmcjetsrlgm2zwep7vgf.streamlit.app/"
 RENDER_API_URL = "https://customer-intelligence-platform-3v6q.onrender.com"
 
@@ -150,6 +151,29 @@ TRANSLATIONS = {
         "detailed_insights": "Detailed Insights",
         "evidence": "Evidence",
         "follow_up_questions": "Follow-up questions",
+        "decision_engine": "Decision Engine",
+        "decision_engine_caption": "Turn anomaly signals into prioritized alerts, recommendations, and AI explanations.",
+        "scenario_inputs": "Scenario Inputs",
+        "use_gemini": "Use Gemini explanation",
+        "run_decision_engine": "Run Decision Engine",
+        "decision_api_error": "Unable to reach the Decision Engine API. Check API_BASE_URL and Render service status.",
+        "decision_explanation": "Decision Explanation",
+        "explanation_source": "Explanation source",
+        "detected_anomalies": "Detected Anomalies",
+        "no_anomalies": "No anomalies detected for this scenario.",
+        "priority_alerts": "Priority Alerts",
+        "no_alerts": "No priority alerts returned.",
+        "decision_recommendations": "Decision Recommendations",
+        "no_recommendations": "No recommendations returned.",
+        "decision_type": "Type",
+        "decision_title": "Decision",
+        "decision_action": "Action",
+        "decision_rationale": "Rationale",
+        "scenario_reorder_rate": "Reorder Rate",
+        "scenario_churn_rate": "Churn Rate",
+        "scenario_days_between_orders": "Days Between Orders",
+        "scenario_data_quality_failures": "Data Quality Failures",
+        "scenario_api_health": "API Health",
     },
     "fr": {
         "toggle_language": "Show in English",
@@ -268,6 +292,29 @@ TRANSLATIONS = {
         "detailed_insights": "Insights détaillés",
         "evidence": "Evidence",
         "follow_up_questions": "Questions de suivi",
+        "decision_engine": "Moteur de decision",
+        "decision_engine_caption": "Transforme les anomalies en alertes priorisees, recommandations et explications IA.",
+        "scenario_inputs": "Scenario de test",
+        "use_gemini": "Utiliser l'explication Gemini",
+        "run_decision_engine": "Executer le moteur de decision",
+        "decision_api_error": "Impossible de joindre l'API Decision Engine. Verifie API_BASE_URL et le statut Render.",
+        "decision_explanation": "Explication de la decision",
+        "explanation_source": "Source de l'explication",
+        "detected_anomalies": "Anomalies detectees",
+        "no_anomalies": "Aucune anomalie detectee pour ce scenario.",
+        "priority_alerts": "Alertes prioritaires",
+        "no_alerts": "Aucune alerte prioritaire retournee.",
+        "decision_recommendations": "Recommandations de decision",
+        "no_recommendations": "Aucune recommandation retournee.",
+        "decision_type": "Type",
+        "decision_title": "Decision",
+        "decision_action": "Action",
+        "decision_rationale": "Raison",
+        "scenario_reorder_rate": "Taux de recommande",
+        "scenario_churn_rate": "Taux de churn",
+        "scenario_days_between_orders": "Jours entre commandes",
+        "scenario_data_quality_failures": "Echecs qualite data",
+        "scenario_api_health": "Sante API",
     },
 }
 
@@ -567,6 +614,17 @@ def request_copilot_insights(question: str) -> dict[str, Any]:
     return response.json()
 
 
+def request_decision_engine(payload: dict[str, Any]) -> dict[str, Any]:
+    api_base_url = settings.api_base_url.rstrip("/")
+    response = requests.post(
+        f"{api_base_url}/decision",
+        json=payload,
+        timeout=DECISION_TIMEOUT_SECONDS,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
 def queue_copilot_question(question: str) -> None:
     st.session_state.pending_copilot_question = question
     st.rerun()
@@ -783,6 +841,24 @@ def render_recommendation_cards(recommendations: list[dict[str, Any]]) -> None:
                 st.markdown(f"**{recommendation.get('action', '')}**")
                 if expected_impact := recommendation.get("expected_impact"):
                     st.write(expected_impact)
+
+
+def render_decision_cards(decisions: list[dict[str, Any]]) -> None:
+    if not decisions:
+        return
+
+    for row_start in range(0, len(decisions), 2):
+        row_decisions = decisions[row_start : row_start + 2]
+        columns = st.columns(len(row_decisions))
+        for column, decision in zip(columns, row_decisions, strict=False):
+            priority = str(decision.get("priority") or "low")
+            with column.container(border=True):
+                st.caption(f"{format_priority_label(priority)} | {str(decision.get('decision_type') or '').title()}")
+                st.markdown(f"**{decision.get('title', '')}**")
+                if action := decision.get("action"):
+                    st.write(action)
+                if rationale := decision.get("rationale"):
+                    st.caption(str(rationale))
 
 
 def render_priority_mix(priority_frame: pd.DataFrame) -> None:
@@ -1300,6 +1376,126 @@ def render_ai_copilot() -> None:
         render_copilot_response(response, message_index=len(st.session_state.copilot_messages) - 1)
 
 
+def build_decision_payload(kpis: dict[str, Any], api_health: dict[str, Any] | None = None) -> dict[str, Any]:
+    api_status = "ok"
+    if api_health and api_health.get("status") != "ok":
+        api_status = "failed"
+
+    return {
+        "reorder_rate": float(kpis.get("reorder_rate") or 0),
+        "churn_rate": 0.50,
+        "days_between_orders": 18.0,
+        "data_quality_failures": 0,
+        "api_health": api_status,
+    }
+
+
+def render_decision_engine(kpis: dict[str, Any]) -> None:
+    st.subheader(translate("decision_engine"))
+    st.caption(translate("decision_engine_caption"))
+
+    default_payload = build_decision_payload(kpis)
+    with st.form("decision_engine_form"):
+        st.markdown(f"**{translate('scenario_inputs')}**")
+        metric_columns = st.columns(3)
+        with metric_columns[0]:
+            reorder_rate = st.slider(
+                translate("scenario_reorder_rate"),
+                min_value=0.0,
+                max_value=1.0,
+                value=float(default_payload["reorder_rate"]),
+                step=0.01,
+                format="%.2f",
+            )
+            data_quality_failures = st.number_input(
+                translate("scenario_data_quality_failures"),
+                min_value=0,
+                value=0,
+                step=1,
+            )
+        with metric_columns[1]:
+            churn_rate = st.slider(
+                translate("scenario_churn_rate"),
+                min_value=0.0,
+                max_value=1.0,
+                value=0.50,
+                step=0.01,
+                format="%.2f",
+            )
+            api_health = st.selectbox(translate("scenario_api_health"), ["ok", "failed"])
+        with metric_columns[2]:
+            days_between_orders = st.slider(
+                translate("scenario_days_between_orders"),
+                min_value=0.0,
+                max_value=60.0,
+                value=18.0,
+                step=1.0,
+            )
+            use_gemini = st.checkbox(translate("use_gemini"), value=False)
+
+        submitted = st.form_submit_button(translate("run_decision_engine"), use_container_width=True)
+
+    if not submitted and "decision_engine_response" not in st.session_state:
+        return
+
+    if submitted:
+        payload = {
+            "data": {
+                "reorder_rate": reorder_rate,
+                "churn_rate": churn_rate,
+                "days_between_orders": days_between_orders,
+                "data_quality_failures": data_quality_failures,
+                "api_health": api_health,
+            },
+            "anomalies": [],
+            "use_gemini": use_gemini,
+        }
+        try:
+            with st.spinner(translate("run_decision_engine")):
+                st.session_state.decision_engine_response = request_decision_engine(payload)
+        except requests.RequestException as exc:
+            logger.exception("Decision Engine API request failed")
+            st.error(translate("decision_api_error"))
+            st.caption(str(exc))
+            return
+
+    response = st.session_state.get("decision_engine_response") or {}
+    decisions = response.get("decisions") or []
+    alerts = [decision for decision in decisions if decision.get("decision_type") == "alert"]
+    recommendations = [decision for decision in decisions if decision.get("decision_type") == "recommendation"]
+    anomalies = response.get("anomalies") or []
+
+    st.divider()
+    summary_columns = st.columns(4)
+    summary_columns[0].metric(translate("detected_anomalies"), format_number(len(anomalies)))
+    summary_columns[1].metric(translate("priority_alerts"), format_number(len(alerts)))
+    summary_columns[2].metric(translate("decision_recommendations"), format_number(len(recommendations)))
+    summary_columns[3].metric(translate("explanation_source"), str(response.get("explanation_source", "local_fallback")))
+
+    if explanation := response.get("explanation"):
+        with st.container(border=True):
+            st.caption(translate("decision_explanation"))
+            st.write(explanation)
+
+    st.markdown(f"**{translate('priority_alerts')}**")
+    if alerts:
+        render_decision_cards(alerts)
+    else:
+        st.info(translate("no_alerts"))
+
+    st.markdown(f"**{translate('decision_recommendations')}**")
+    if recommendations:
+        render_decision_cards(recommendations)
+    else:
+        st.info(translate("no_recommendations"))
+
+    st.markdown(f"**{translate('detected_anomalies')}**")
+    if anomalies:
+        st.dataframe(pd.DataFrame(anomalies), use_container_width=True, hide_index=True)
+    else:
+        st.info(translate("no_anomalies"))
+
+
 def render_sidebar() -> None:
     st.sidebar.header(translate("controls"))
     st.sidebar.write(f"{translate('language')}: `{'Français' if get_language() == 'fr' else 'English'}`")
@@ -1333,7 +1529,16 @@ def main() -> None:
     render_kpis(kpis)
     st.divider()
 
-    overview_tab, customer_tab, product_tab, quality_tab, health_tab, model_tab, copilot_tab = st.tabs(
+    (
+        overview_tab,
+        customer_tab,
+        product_tab,
+        quality_tab,
+        health_tab,
+        model_tab,
+        decision_tab,
+        copilot_tab,
+    ) = st.tabs(
         [
             translate("project_overview"),
             translate("customer_insights"),
@@ -1341,6 +1546,7 @@ def main() -> None:
             translate("data_quality"),
             translate("pipeline_health"),
             translate("model_performance"),
+            translate("decision_engine"),
             translate("ai_copilot"),
         ]
     )
@@ -1356,6 +1562,8 @@ def main() -> None:
         render_pipeline_health()
     with model_tab:
         render_model_performance(model_metrics, feature_importance)
+    with decision_tab:
+        render_decision_engine(kpis)
     with copilot_tab:
         render_ai_copilot()
 

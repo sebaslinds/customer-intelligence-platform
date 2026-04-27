@@ -281,6 +281,7 @@ The Streamlit dashboard includes:
 - Data Quality
 - Pipeline Health
 - Model Performance
+- Decision Engine
 - AI Copilot
 
 Recent dashboard improvements:
@@ -292,6 +293,7 @@ Recent dashboard improvements:
 - clearer priority mix explanation for recommendations
 - interactive Altair charts with horizontal or angled x-axis labels
 - health checks for Snowflake, Render API, model artifacts, and model metrics
+- decision scenario simulator for anomaly-driven alerts and recommendations
 
 The AI Copilot tab supports questions such as:
 
