@@ -8,11 +8,11 @@ import pandas as pd
 from fastapi import FastAPI, HTTPException, status
 from pydantic import BaseModel, Field
 
+from api.v1.router import api_router
 from api.copilot import router as copilot_router
 from config.logging_config import configure_logging
 from config.production import validate_production_settings
 from config.settings import get_settings
-from services.decision.engine import DecisionRequest, DecisionResponse, run_decision_engine
 
 settings = get_settings()
 validate_production_settings(settings)
@@ -87,7 +87,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.include_router(copilot_router)
-
+app.include_router(api_router)
 
 @app.get("/health", tags=["system"])
 def health_check() -> dict[str, str | bool]:
@@ -118,15 +118,3 @@ def predict(payload: PredictionRequest) -> PredictionResponse:
         ) from None
 
     return PredictionResponse(reorder_probability=probability)
-
-
-@app.post("/decision", response_model=DecisionResponse, tags=["decision-engine"])
-def create_decision(payload: DecisionRequest) -> DecisionResponse:
-    try:
-        return run_decision_engine(payload, settings=settings)
-    except Exception:
-        logger.exception("Decision engine failed")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Decision engine failed.",
-        ) from None
