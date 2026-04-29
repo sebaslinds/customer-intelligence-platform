@@ -35,6 +35,18 @@ models:
         tests:
           - unique
           - not_null
+      - name: order_count
+        description: Total number of orders placed by the user.
+        tests:
+          - not_null
+      - name: order_frequency_30d
+        description: Approximate monthly order frequency based on observed order cadence.
+        tests:
+          - not_null
+      - name: customer_frequency_segment
+        description: Frequency segment derived from lifetime order count.
+        tests:
+          - not_null
 
   - name: feature_store
     description: User-level feature table for customer intelligence and machine learning workflows.
@@ -52,6 +64,10 @@ models:
         description: Average number of items per observed basket. Prior order basket lines are unavailable in the sampled dataset.
         tests:
           - not_null
+      - name: stddev_basket_size
+        description: Variability in observed basket size.
+        tests:
+          - not_null
       - name: observed_basket_orders
         description: Number of orders with observed item-level basket data.
         tests:
@@ -66,6 +82,46 @@ models:
           - not_null
       - name: days_between_orders
         description: Average number of days between user orders.
+      - name: stddev_days_between_orders
+        description: Variability in days between user orders.
+        tests:
+          - not_null
+      - name: customer_tenure_days
+        description: Total observed days between the user's orders.
+        tests:
+          - not_null
+      - name: max_days_between_orders
+        description: Longest observed gap between orders for the user.
+        tests:
+          - not_null
+      - name: avg_order_dow
+        description: Average order day of week for the user.
+        tests:
+          - not_null
+      - name: avg_order_hour_of_day
+        description: Average order hour of day for the user.
+        tests:
+          - not_null
+      - name: weekend_order_ratio
+        description: Share of user orders placed on weekends.
+        tests:
+          - not_null
+      - name: evening_order_ratio
+        description: Share of user orders placed during evening or overnight hours.
+        tests:
+          - not_null
+      - name: active_order_dow_count
+        description: Number of distinct weekdays on which the user places orders.
+        tests:
+          - not_null
+      - name: observed_basket_coverage
+        description: Share of user orders with item-level basket data available.
+        tests:
+          - not_null
+      - name: order_frequency_30d
+        description: Approximate monthly order frequency based on observed cadence.
+        tests:
+          - not_null
       - name: will_reorder
         description: Binary label indicating whether the user has reordered at least one item.
         tests:

@@ -219,6 +219,26 @@ TRANSLATIONS = {
         "decision_engine": "Decision Engine",
         "decision_engine_caption": "Turn anomaly signals into prioritized alerts, recommendations, and AI explanations.",
         "scenario_inputs": "Scenario Inputs",
+        "business_scenario_levers": "Business scenario levers",
+        "business_scenario_caption": (
+            "These values let you test business scenarios. Operational signals below are detected automatically."
+        ),
+        "detected_operational_signals": "Detected operational signals",
+        "detected_operational_caption": (
+            "Data quality and API health are read from live checks; they cannot be manually selected here."
+        ),
+        "decision_engine_how_it_works": "How the decision engine works",
+        "decision_engine_how_it_works_text": (
+            "The engine reads business metrics and operational checks, detects anomalies against rule thresholds, "
+            "prioritizes decisions by severity, then generates a Gemini explanation when available."
+        ),
+        "decision_rulebook": "Decision rulebook",
+        "decision_rule": "Rule",
+        "decision_trigger": "Trigger",
+        "decision_output": "Output",
+        "decision_signal_source": "Signal source",
+        "observed_value": "Observed value",
+        "signal_detail": "Detail",
         "use_gemini": "Use Gemini explanation",
         "run_decision_engine": "Run Decision Engine",
         "decision_api_error": "Unable to reach the Decision Engine API. Check API_BASE_URL and Render service status.",
@@ -435,6 +455,26 @@ TRANSLATIONS = {
         "decision_engine": "Moteur de decision",
         "decision_engine_caption": "Transforme les anomalies en alertes priorisees, recommandations et explications IA.",
         "scenario_inputs": "Scenario de test",
+        "business_scenario_levers": "Leviers de scenario business",
+        "business_scenario_caption": (
+            "Ces valeurs servent a tester des scenarios business. Les signaux operationnels ci-dessous sont detectes automatiquement."
+        ),
+        "detected_operational_signals": "Signaux operationnels detectes",
+        "detected_operational_caption": (
+            "La qualite des donnees et la sante API viennent de checks live; elles ne sont pas selectionnees manuellement."
+        ),
+        "decision_engine_how_it_works": "Comment fonctionne le moteur de decision",
+        "decision_engine_how_it_works_text": (
+            "Le moteur lit les metriques business et les checks operationnels, detecte les anomalies avec des seuils, "
+            "priorise les decisions par severite, puis genere une explication Gemini lorsque disponible."
+        ),
+        "decision_rulebook": "Regles du moteur",
+        "decision_rule": "Regle",
+        "decision_trigger": "Declencheur",
+        "decision_output": "Sortie",
+        "decision_signal_source": "Source du signal",
+        "observed_value": "Valeur observee",
+        "signal_detail": "Detail",
         "use_gemini": "Utiliser l'explication Gemini",
         "run_decision_engine": "Executer le moteur de decision",
         "decision_api_error": "Impossible de joindre l'API Decision Engine. Verifie API_BASE_URL et le statut Render.",
@@ -510,9 +550,17 @@ def load_customer_insights() -> pd.DataFrame:
             total_orders,
             observed_basket_orders,
             avg_basket_size,
+            stddev_basket_size,
             reorder_ratio,
+            reorder_order_ratio,
             unique_products,
-            days_between_orders
+            days_between_orders,
+            stddev_days_between_orders,
+            customer_tenure_days,
+            order_frequency_30d,
+            avg_order_hour_of_day,
+            weekend_order_ratio,
+            evening_order_ratio
         from feature_store
         order by total_orders desc, user_id
         limit 25
@@ -733,6 +781,60 @@ def format_api_health_detail(api_detail: dict[str, Any]) -> str:
     if "model_loaded" in api_detail:
         return f"model_loaded={api_detail.get('model_loaded')}"
     return "No health payload returned"
+
+
+def load_decision_observed_signals() -> dict[str, Any]:
+    signals: dict[str, Any] = {
+        "data_quality_failures": 0,
+        "data_quality_status": "unknown",
+        "data_quality_detail": "Data quality checks have not been evaluated.",
+        "api_health": "failed",
+        "api_health_status": "failed",
+        "api_health_detail": "API health has not been evaluated.",
+    }
+
+    try:
+        quality_results = load_data_quality_results()
+        total_checks = len(quality_results)
+        failed_checks = int((quality_results["status"] != "Passed").sum()) if total_checks else 0
+        signals.update(
+            {
+                "data_quality_failures": failed_checks,
+                "data_quality_status": "passed" if failed_checks == 0 else "failed",
+                "data_quality_detail": f"{failed_checks} failed checks out of {total_checks}",
+            }
+        )
+    except Exception as exc:
+        logger.exception("Decision Engine data quality signal check failed")
+        signals.update(
+            {
+                "data_quality_failures": 1,
+                "data_quality_status": "unavailable",
+                "data_quality_detail": str(exc),
+            }
+        )
+
+    try:
+        api_detail = load_api_health()
+        api_ok = api_detail.get("status") == "ok"
+        signals.update(
+            {
+                "api_health": "ok" if api_ok else "failed",
+                "api_health_status": "ok" if api_ok else "failed",
+                "api_health_detail": format_api_health_detail(api_detail),
+            }
+        )
+    except Exception as exc:
+        logger.exception("Decision Engine API health signal check failed")
+        signals.update(
+            {
+                "api_health": "failed",
+                "api_health_status": "failed",
+                "api_health_detail": str(exc),
+            }
+        )
+
+    return signals
 
 
 @st.cache_data(show_spinner=False)
@@ -1010,6 +1112,63 @@ def render_decision_cards(decisions: list[dict[str, Any]]) -> None:
                     st.caption(str(rationale))
 
 
+def render_decision_engine_explainer() -> None:
+    with st.expander(translate("decision_engine_how_it_works"), expanded=True):
+        st.write(translate("decision_engine_how_it_works_text"))
+        rules = [
+            {
+                translate("decision_rule"): "Low reorder rate",
+                translate("decision_trigger"): "reorder_rate < 0.35",
+                translate("priority_level"): "high",
+                translate("decision_output"): "Retention recommendation",
+            },
+            {
+                translate("decision_rule"): "Elevated churn",
+                translate("decision_trigger"): "churn_rate >= 0.50",
+                translate("priority_level"): "high / critical",
+                translate("decision_output"): "Retention intervention",
+            },
+            {
+                translate("decision_rule"): "Long order gap",
+                translate("decision_trigger"): "days_between_orders >= 21",
+                translate("priority_level"): "high",
+                translate("decision_output"): "Reorder reminder action",
+            },
+            {
+                translate("decision_rule"): "Data quality failure",
+                translate("decision_trigger"): "failed_checks > 0",
+                translate("priority_level"): "critical",
+                translate("decision_output"): "Pause downstream refresh",
+            },
+            {
+                translate("decision_rule"): "API unhealthy",
+                translate("decision_trigger"): "health endpoint != ok",
+                translate("priority_level"): "critical",
+                translate("decision_output"): "Restore API availability",
+            },
+        ]
+        st.caption(translate("decision_rulebook"))
+        st.dataframe(pd.DataFrame(rules), use_container_width=True, hide_index=True)
+
+
+def render_detected_operational_signals(signals: dict[str, Any]) -> None:
+    st.markdown(f"**{translate('detected_operational_signals')}**")
+    st.caption(translate("detected_operational_caption"))
+    signal_rows = [
+        {
+            translate("decision_signal_source"): translate("scenario_data_quality_failures"),
+            translate("observed_value"): signals.get("data_quality_failures", 0),
+            translate("signal_detail"): signals.get("data_quality_detail", ""),
+        },
+        {
+            translate("decision_signal_source"): translate("scenario_api_health"),
+            translate("observed_value"): signals.get("api_health_status", "unknown"),
+            translate("signal_detail"): signals.get("api_health_detail", ""),
+        },
+    ]
+    st.dataframe(pd.DataFrame(signal_rows), use_container_width=True, hide_index=True)
+
+
 def render_priority_mix(priority_frame: pd.DataFrame) -> None:
     if priority_frame.empty:
         return
@@ -1153,9 +1312,17 @@ def render_customer_insights(frame: pd.DataFrame) -> None:
             "total_orders": st.column_config.NumberColumn("Total Orders", format="%d"),
             "observed_basket_orders": st.column_config.NumberColumn("Observed Baskets", format="%d"),
             "avg_basket_size": st.column_config.NumberColumn("Avg Basket Size", format="%.2f"),
+            "stddev_basket_size": st.column_config.NumberColumn("Basket Variability", format="%.2f"),
             "reorder_ratio": st.column_config.ProgressColumn("Reorder Ratio", format="%.2f", min_value=0, max_value=1),
+            "reorder_order_ratio": st.column_config.ProgressColumn("Reorder Order Ratio", format="%.2f", min_value=0, max_value=1),
             "unique_products": st.column_config.NumberColumn("Unique Products", format="%d"),
             "days_between_orders": st.column_config.NumberColumn("Days Between Orders", format="%.2f"),
+            "stddev_days_between_orders": st.column_config.NumberColumn("Gap Variability", format="%.2f"),
+            "customer_tenure_days": st.column_config.NumberColumn("Tenure Days", format="%.0f"),
+            "order_frequency_30d": st.column_config.NumberColumn("Monthly Frequency", format="%.2f"),
+            "avg_order_hour_of_day": st.column_config.NumberColumn("Avg Order Hour", format="%.1f"),
+            "weekend_order_ratio": st.column_config.ProgressColumn("Weekend Ratio", format="%.2f", min_value=0, max_value=1),
+            "evening_order_ratio": st.column_config.ProgressColumn("Evening Ratio", format="%.2f", min_value=0, max_value=1),
         },
     )
 
@@ -2019,17 +2186,13 @@ def render_ai_copilot() -> None:
         render_copilot_response(response, message_index=len(st.session_state.copilot_messages) - 1)
 
 
-def build_decision_payload(kpis: dict[str, Any], api_health: dict[str, Any] | None = None) -> dict[str, Any]:
-    api_status = "ok"
-    if api_health and api_health.get("status") != "ok":
-        api_status = "failed"
-
+def build_decision_payload(kpis: dict[str, Any], observed_signals: dict[str, Any]) -> dict[str, Any]:
     return {
         "reorder_rate": float(kpis.get("reorder_rate") or 0),
         "churn_rate": 0.50,
         "days_between_orders": 18.0,
-        "data_quality_failures": 0,
-        "api_health": api_status,
+        "data_quality_failures": int(observed_signals.get("data_quality_failures") or 0),
+        "api_health": observed_signals.get("api_health", "failed"),
     }
 
 
@@ -2037,9 +2200,13 @@ def render_decision_engine(kpis: dict[str, Any]) -> None:
     st.subheader(translate("decision_engine"))
     st.caption(translate("decision_engine_caption"))
 
-    default_payload = build_decision_payload(kpis)
+    render_decision_engine_explainer()
+    observed_signals = load_decision_observed_signals()
+    default_payload = build_decision_payload(kpis, observed_signals)
+
     with st.form("decision_engine_form"):
-        st.markdown(f"**{translate('scenario_inputs')}**")
+        st.markdown(f"**{translate('business_scenario_levers')}**")
+        st.caption(translate("business_scenario_caption"))
         metric_columns = st.columns(3)
         with metric_columns[0]:
             reorder_rate = st.slider(
@@ -2050,12 +2217,6 @@ def render_decision_engine(kpis: dict[str, Any]) -> None:
                 step=0.01,
                 format="%.2f",
             )
-            data_quality_failures = st.number_input(
-                translate("scenario_data_quality_failures"),
-                min_value=0,
-                value=0,
-                step=1,
-            )
         with metric_columns[1]:
             churn_rate = st.slider(
                 translate("scenario_churn_rate"),
@@ -2065,7 +2226,6 @@ def render_decision_engine(kpis: dict[str, Any]) -> None:
                 step=0.01,
                 format="%.2f",
             )
-            api_health = st.selectbox(translate("scenario_api_health"), ["ok", "failed"])
         with metric_columns[2]:
             days_between_orders = st.slider(
                 translate("scenario_days_between_orders"),
@@ -2076,6 +2236,7 @@ def render_decision_engine(kpis: dict[str, Any]) -> None:
             )
             use_gemini = st.checkbox(translate("use_gemini"), value=False)
 
+        render_detected_operational_signals(observed_signals)
         submitted = st.form_submit_button(translate("run_decision_engine"), use_container_width=True)
 
     if not submitted and "decision_engine_response" not in st.session_state:
@@ -2087,8 +2248,8 @@ def render_decision_engine(kpis: dict[str, Any]) -> None:
                 "reorder_rate": reorder_rate,
                 "churn_rate": churn_rate,
                 "days_between_orders": days_between_orders,
-                "data_quality_failures": data_quality_failures,
-                "api_health": api_health,
+                "data_quality_failures": observed_signals.get("data_quality_failures", 0),
+                "api_health": observed_signals.get("api_health", "failed"),
             },
             "anomalies": [],
             "use_gemini": use_gemini,
