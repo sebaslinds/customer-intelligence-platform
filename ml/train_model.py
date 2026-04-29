@@ -8,11 +8,16 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
     accuracy_score,
+    average_precision_score,
+    balanced_accuracy_score,
+    brier_score_loss,
     classification_report,
     confusion_matrix,
     f1_score,
+    precision_recall_curve,
     precision_score,
     recall_score,
+    roc_curve,
     roc_auc_score,
 )
 from sklearn.model_selection import train_test_split
@@ -28,6 +33,7 @@ DEFAULT_MODEL_PATH = Path("ml/artifacts/random_forest_reorder_model.joblib")
 DEFAULT_METRICS_PATH = Path("ml/artifacts/training_metrics.json")
 DEFAULT_FEATURE_IMPORTANCE_PATH = Path("ml/artifacts/feature_importance.csv")
 DEFAULT_SOURCE_RELATION = "fct_orders"
+MAX_CURVE_POINTS = 200
 
 
 def load_feature_store(table_name: str) -> pd.DataFrame:
@@ -107,6 +113,120 @@ def build_training_matrix(
     return features, target
 
 
+def build_threshold_analysis(target: pd.Series, probabilities: pd.Series | list[float]) -> list[dict[str, float]]:
+    rows = []
+    for threshold in [round(value / 10, 1) for value in range(1, 10)]:
+        predictions = [1 if probability >= threshold else 0 for probability in probabilities]
+        rows.append(
+            {
+                "threshold": threshold,
+                "precision": float(precision_score(target, predictions, zero_division=0)),
+                "recall": float(recall_score(target, predictions, zero_division=0)),
+                "f1": float(f1_score(target, predictions, zero_division=0)),
+                "positive_prediction_rate": float(sum(predictions) / len(predictions)),
+            }
+        )
+    return rows
+
+
+def build_curve_rows(
+    target: pd.Series,
+    probabilities: pd.Series | list[float],
+) -> tuple[list[dict[str, float]], list[dict[str, float | None]]]:
+    if target.nunique() != 2:
+        return [], []
+
+    fpr, tpr, roc_thresholds = roc_curve(target, probabilities)
+    roc_rows = [
+        {
+            "false_positive_rate": float(false_positive_rate),
+            "true_positive_rate": float(true_positive_rate),
+            "threshold": None if threshold == float("inf") else float(threshold),
+        }
+        for false_positive_rate, true_positive_rate, threshold in zip(fpr, tpr, roc_thresholds, strict=False)
+    ]
+
+    precision, recall, pr_thresholds = precision_recall_curve(target, probabilities)
+    pr_rows = []
+    for index, (precision_value, recall_value) in enumerate(zip(precision, recall, strict=False)):
+        threshold = float(pr_thresholds[index]) if index < len(pr_thresholds) else None
+        pr_rows.append(
+            {
+                "precision": float(precision_value),
+                "recall": float(recall_value),
+                "threshold": threshold,
+            }
+        )
+
+    return roc_rows, pr_rows
+
+
+def sample_curve_rows(rows: list[dict[str, float | None]], max_points: int = MAX_CURVE_POINTS) -> list[dict[str, float | None]]:
+    if len(rows) <= max_points:
+        return rows
+
+    step = (len(rows) - 1) / (max_points - 1)
+    indexes = {round(index * step) for index in range(max_points)}
+    return [row for index, row in enumerate(rows) if index in indexes]
+
+
+def build_model_recommendations(
+    metrics: dict[str, object],
+    feature_importance: pd.DataFrame,
+) -> list[dict[str, str]]:
+    recommendations = []
+    positive_rate = float(metrics.get("positive_rate") or 0)
+    roc_auc = metrics.get("roc_auc")
+    recall = float(metrics.get("recall") or 0)
+    precision = float(metrics.get("precision") or 0)
+
+    if positive_rate >= 0.8:
+        recommendations.append(
+            {
+                "priority": "high",
+                "action": "Monitor class imbalance before using the model for automated targeting.",
+                "expected_impact": (
+                    "The dataset contains many reorder-positive examples, so accuracy alone can overstate "
+                    "model quality. Use recall, precision, and threshold analysis together."
+                ),
+            }
+        )
+
+    if roc_auc is not None and float(roc_auc) < 0.72:
+        recommendations.append(
+            {
+                "priority": "medium",
+                "action": "Add richer behavioral features such as recency, product affinity, and department mix.",
+                "expected_impact": "Improves separation between likely reorders and customers who may churn.",
+            }
+        )
+
+    if recall < precision:
+        recommendations.append(
+            {
+                "priority": "medium",
+                "action": "Tune the prediction threshold based on campaign goals.",
+                "expected_impact": (
+                    "Lower thresholds catch more potential reorderers; higher thresholds reduce false positives "
+                    "for expensive retention campaigns."
+                ),
+            }
+        )
+
+    if not feature_importance.empty and feature_importance["importance"].head(2).sum() > 0.85:
+        recommendations.append(
+            {
+                "priority": "medium",
+                "action": "Reduce dependence on only a few features.",
+                "expected_impact": (
+                    "A broader feature set usually makes the model more stable and easier to explain to business users."
+                ),
+            }
+        )
+
+    return recommendations
+
+
 def train_random_forest(
     features: pd.DataFrame,
     target: pd.Series,
@@ -134,23 +254,35 @@ def train_random_forest(
 
     predictions = model.predict(x_test)
     probabilities = model.predict_proba(x_test)[:, 1]
+    matrix = confusion_matrix(y_test, predictions)
+    threshold_analysis = build_threshold_analysis(y_test, probabilities)
+    roc_rows, precision_recall_rows = build_curve_rows(y_test, probabilities)
 
     metrics = {
         "accuracy": float(accuracy_score(y_test, predictions)),
+        "balanced_accuracy": float(balanced_accuracy_score(y_test, predictions)),
         "precision": float(precision_score(y_test, predictions, zero_division=0)),
         "recall": float(recall_score(y_test, predictions, zero_division=0)),
         "f1": float(f1_score(y_test, predictions, zero_division=0)),
         "roc_auc": float(roc_auc_score(y_test, probabilities)) if y_test.nunique() == 2 else None,
+        "average_precision": (
+            float(average_precision_score(y_test, probabilities)) if y_test.nunique() == 2 else None
+        ),
+        "brier_score": float(brier_score_loss(y_test, probabilities)),
         "train_rows": len(x_train),
         "test_rows": len(x_test),
         "positive_rate": float(target.mean()),
-        "confusion_matrix": confusion_matrix(y_test, predictions).tolist(),
+        "confusion_matrix": matrix.tolist(),
         "classification_report": classification_report(
             y_test,
             predictions,
             output_dict=True,
             zero_division=0,
         ),
+        "threshold_analysis": threshold_analysis,
+        "recommended_threshold": max(threshold_analysis, key=lambda row: row["f1"])["threshold"],
+        "roc_curve": sample_curve_rows(roc_rows),
+        "precision_recall_curve": sample_curve_rows(precision_recall_rows),
     }
 
     feature_importance = pd.DataFrame(
@@ -159,6 +291,7 @@ def train_random_forest(
             "importance": model.feature_importances_,
         }
     ).sort_values("importance", ascending=False)
+    metrics["model_recommendations"] = build_model_recommendations(metrics, feature_importance)
 
     return model, metrics, feature_importance
 

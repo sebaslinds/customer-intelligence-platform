@@ -118,6 +118,32 @@ TRANSLATIONS = {
         "positive_rate": "Positive Rate",
         "confusion_matrix": "Confusion Matrix",
         "feature_importance": "Feature Importance",
+        "model_explanation": "What The Model Predicts",
+        "model_explanation_text": (
+            "This RandomForest estimates whether a future order is likely to include reordered products. "
+            "Because repeat purchases dominate the dataset, balanced metrics and threshold analysis matter "
+            "more than accuracy alone."
+        ),
+        "balanced_accuracy": "Balanced Accuracy",
+        "average_precision": "Average Precision",
+        "brier_score": "Brier Score",
+        "recommended_threshold": "Recommended Threshold",
+        "threshold_analysis": "Threshold Analysis",
+        "roc_curve": "ROC Curve",
+        "precision_recall_curve": "Precision-Recall Curve",
+        "classification_report": "Classification Report",
+        "prediction_errors": "Prediction Errors",
+        "true_negatives": "True Negatives",
+        "false_positives": "False Positives",
+        "false_negatives": "False Negatives",
+        "true_positives": "True Positives",
+        "model_interpretation": "Model Interpretation",
+        "feature_importance_help": (
+            "Feature importance shows which inputs most influenced the RandomForest. If only one or two "
+            "features dominate, the next improvement is to add richer customer and product behavior signals."
+        ),
+        "model_recommendations": "Model Recommendations",
+        "no_curve_data": "Run the ML training pipeline again to generate curve and threshold data.",
         "ai_copilot": "AI Copilot",
         "ai_business_copilot": "AI Business Copilot",
         "ai_copilot_caption": "Ask business questions about churn, reorders, products, retention, and customer behavior.",
@@ -268,6 +294,33 @@ TRANSLATIONS = {
         "positive_rate": "Taux Positif",
         "confusion_matrix": "Matrice De Confusion",
         "feature_importance": "Importance des features",
+        "model_explanation": "Ce que predit le modele",
+        "model_explanation_text": (
+            "Ce RandomForest estime si une future commande contient probablement des produits recommandes. "
+            "Comme les rachats dominent le dataset, les metriques equilibrees et l'analyse des seuils sont "
+            "plus importantes que l'accuracy seule."
+        ),
+        "balanced_accuracy": "Accuracy equilibree",
+        "average_precision": "Precision moyenne",
+        "brier_score": "Score de Brier",
+        "recommended_threshold": "Seuil recommande",
+        "threshold_analysis": "Analyse des seuils",
+        "roc_curve": "Courbe ROC",
+        "precision_recall_curve": "Courbe precision-recall",
+        "classification_report": "Rapport de classification",
+        "prediction_errors": "Erreurs de prediction",
+        "true_negatives": "Vrais negatifs",
+        "false_positives": "Faux positifs",
+        "false_negatives": "Faux negatifs",
+        "true_positives": "Vrais positifs",
+        "model_interpretation": "Interpretation du modele",
+        "feature_importance_help": (
+            "L'importance des features montre quelles variables influencent le plus le RandomForest. "
+            "Si une ou deux features dominent, la prochaine amelioration est d'ajouter des signaux clients "
+            "et produits plus riches."
+        ),
+        "model_recommendations": "Recommandations modele",
+        "no_curve_data": "Relance le pipeline ML pour generer les courbes et l'analyse des seuils.",
         "ai_copilot": "Copilot IA",
         "ai_business_copilot": "Copilot Business IA",
         "ai_copilot_caption": "Pose des questions business sur le churn, les recommandes, les produits, la retention et les clients.",
@@ -1214,40 +1267,264 @@ def render_pipeline_health() -> None:
         )
 
 
+def build_confusion_summary(confusion_matrix: list[list[int]]) -> dict[str, int]:
+    if len(confusion_matrix) < 2 or len(confusion_matrix[0]) < 2 or len(confusion_matrix[1]) < 2:
+        return {}
+
+    return {
+        "true_negatives": int(confusion_matrix[0][0]),
+        "false_positives": int(confusion_matrix[0][1]),
+        "false_negatives": int(confusion_matrix[1][0]),
+        "true_positives": int(confusion_matrix[1][1]),
+    }
+
+
+def build_classification_report_frame(metrics: dict[str, Any]) -> pd.DataFrame:
+    report = metrics.get("classification_report") or {}
+    rows = []
+    labels = {
+        "0": "No Reorder",
+        "1": "Reorder",
+        "macro avg": "Macro Avg",
+        "weighted avg": "Weighted Avg",
+    }
+    for key, label in labels.items():
+        values = report.get(key)
+        if not isinstance(values, dict):
+            continue
+
+        rows.append(
+            {
+                "class": label,
+                "precision": float(values.get("precision", 0)),
+                "recall": float(values.get("recall", 0)),
+                "f1_score": float(values.get("f1-score", 0)),
+                "support": int(values.get("support", 0)),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def build_default_ml_recommendations(
+    metrics: dict[str, Any],
+    feature_importance: pd.DataFrame,
+) -> list[dict[str, str]]:
+    recommendations = []
+    positive_rate = float(metrics.get("positive_rate") or 0)
+    roc_auc = metrics.get("roc_auc")
+    precision = float(metrics.get("precision") or 0)
+    recall = float(metrics.get("recall") or 0)
+
+    if positive_rate >= 0.8:
+        recommendations.append(
+            {
+                "priority": "HIGH",
+                "action": "Monitor class imbalance before using the model for automated targeting.",
+                "expected_impact": (
+                    "Repeat-order examples dominate the training data, so use precision, recall, and threshold "
+                    "tradeoffs instead of accuracy alone."
+                ),
+            }
+        )
+
+    if roc_auc is not None and float(roc_auc) < 0.72:
+        recommendations.append(
+            {
+                "priority": "MEDIUM",
+                "action": "Add richer features: recency, product affinity, department mix, and last-order behavior.",
+                "expected_impact": "Better features should improve separation between reorder and churn-risk behavior.",
+            }
+        )
+
+    if precision > recall:
+        recommendations.append(
+            {
+                "priority": "MEDIUM",
+                "action": "Tune the classification threshold before launching retention campaigns.",
+                "expected_impact": (
+                    "Lower thresholds improve coverage; higher thresholds reduce false positives for costly campaigns."
+                ),
+            }
+        )
+
+    if not feature_importance.empty and feature_importance["importance"].head(2).sum() > 0.85:
+        recommendations.append(
+            {
+                "priority": "MEDIUM",
+                "action": "Reduce reliance on only the top features.",
+                "expected_impact": "A broader signal set makes predictions more stable and more explainable.",
+            }
+        )
+
+    return recommendations
+
+
+def render_line_chart(
+    frame: pd.DataFrame,
+    x_column: str,
+    y_columns: list[str],
+    *,
+    title: str,
+    y_title: str | None = None,
+    height: int = 320,
+) -> None:
+    if frame.empty:
+        return
+
+    available_columns = [column for column in y_columns if column in frame.columns]
+    if not available_columns:
+        return
+
+    chart_frame = frame[[x_column, *available_columns]].melt(
+        id_vars=x_column,
+        var_name="metric",
+        value_name="value",
+    )
+    chart = (
+        alt.Chart(chart_frame)
+        .mark_line(point=True, strokeWidth=3)
+        .encode(
+            x=alt.X(f"{x_column}:Q", axis=alt.Axis(title=x_column.replace("_", " ").title())),
+            y=alt.Y("value:Q", axis=alt.Axis(title=y_title or "Value"), scale=alt.Scale(zero=True)),
+            color=alt.Color("metric:N", title="Metric"),
+            tooltip=[
+                alt.Tooltip(f"{x_column}:Q", format=".2f"),
+                alt.Tooltip("metric:N"),
+                alt.Tooltip("value:Q", format=".3f"),
+            ],
+        )
+        .properties(title=title, height=height)
+    )
+    st.altair_chart(chart, use_container_width=True)
+
+
+def render_model_summary_cards(metrics: dict[str, Any], feature_importance: pd.DataFrame) -> None:
+    top_feature = "N/A"
+    if not feature_importance.empty:
+        top_feature = str(feature_importance.iloc[0]["feature"]).replace("_", " ").title()
+
+    with st.container(border=True):
+        st.caption(translate("model_explanation"))
+        st.write(translate("model_explanation_text"))
+        col_a, col_b, col_c = st.columns(3)
+        col_a.metric(translate("positive_rate"), format_percent(metrics.get("positive_rate", 0)))
+        col_b.metric(translate("recommended_threshold"), f"{float(metrics.get('recommended_threshold') or 0.5):.2f}")
+        col_c.metric("Top Driver", top_feature)
+
+
 def render_model_performance(metrics: dict[str, Any], feature_importance: pd.DataFrame) -> None:
     st.subheader(translate("model_performance"))
     if not metrics:
         st.info(translate("no_model_metrics"))
         return
 
-    accuracy, precision, recall, f1_score, roc_auc = st.columns(5)
+    render_model_summary_cards(metrics, feature_importance)
+
+    accuracy, balanced_accuracy, precision, recall, f1_score, roc_auc = st.columns(6)
     accuracy.metric(translate("accuracy"), format_percent(metrics.get("accuracy", 0)))
+    balanced_accuracy.metric(translate("balanced_accuracy"), format_percent(metrics.get("balanced_accuracy", 0)))
     precision.metric(translate("precision"), format_percent(metrics.get("precision", 0)))
     recall.metric(translate("recall"), format_percent(metrics.get("recall", 0)))
     f1_score.metric(translate("f1_score"), format_percent(metrics.get("f1", 0)))
     roc_auc.metric(translate("roc_auc"), f"{float(metrics.get('roc_auc') or 0):.3f}")
 
-    train_rows, test_rows, positive_rate = st.columns(3)
+    train_rows, test_rows, positive_rate, avg_precision, brier_score = st.columns(5)
     train_rows.metric(translate("train_rows"), format_number(metrics.get("train_rows", 0)))
     test_rows.metric(translate("test_rows"), format_number(metrics.get("test_rows", 0)))
     positive_rate.metric(translate("positive_rate"), format_percent(metrics.get("positive_rate", 0)))
+    avg_precision.metric(translate("average_precision"), f"{float(metrics.get('average_precision') or 0):.3f}")
+    brier_score.metric(translate("brier_score"), f"{float(metrics.get('brier_score') or 0):.3f}")
 
     st.divider()
 
     confusion_matrix = metrics.get("confusion_matrix", [])
     if confusion_matrix:
+        st.subheader(translate("prediction_errors"))
+        summary = build_confusion_summary(confusion_matrix)
+        if summary:
+            tn, fp, fn, tp = st.columns(4)
+            tn.metric(translate("true_negatives"), format_number(summary["true_negatives"]))
+            fp.metric(translate("false_positives"), format_number(summary["false_positives"]))
+            fn.metric(translate("false_negatives"), format_number(summary["false_negatives"]))
+            tp.metric(translate("true_positives"), format_number(summary["true_positives"]))
+
         confusion_frame = pd.DataFrame(
             confusion_matrix,
             index=["Actual No Reorder", "Actual Reorder"],
             columns=["Predicted No Reorder", "Predicted Reorder"],
         )
-        st.subheader(translate("confusion_matrix"))
-        st.dataframe(confusion_frame, use_container_width=True)
+        with st.expander(translate("confusion_matrix")):
+            st.dataframe(confusion_frame, use_container_width=True)
+
+    threshold_rows = metrics.get("threshold_analysis") or []
+    roc_rows = metrics.get("roc_curve") or []
+    pr_rows = metrics.get("precision_recall_curve") or []
+
+    if threshold_rows or roc_rows or pr_rows:
+        curve_left, curve_right = st.columns(2)
+        with curve_left:
+            if threshold_rows:
+                render_line_chart(
+                    pd.DataFrame(threshold_rows),
+                    "threshold",
+                    ["precision", "recall", "f1"],
+                    title=translate("threshold_analysis"),
+                    y_title="Score",
+                    height=330,
+                )
+            else:
+                st.info(translate("no_curve_data"))
+
+        with curve_right:
+            if roc_rows:
+                render_line_chart(
+                    pd.DataFrame(roc_rows),
+                    "false_positive_rate",
+                    ["true_positive_rate"],
+                    title=translate("roc_curve"),
+                    y_title="True Positive Rate",
+                    height=330,
+                )
+            elif pr_rows:
+                render_line_chart(
+                    pd.DataFrame(pr_rows),
+                    "recall",
+                    ["precision"],
+                    title=translate("precision_recall_curve"),
+                    y_title="Precision",
+                    height=330,
+                )
+    else:
+        st.info(translate("no_curve_data"))
+
+    report_frame = build_classification_report_frame(metrics)
+    if not report_frame.empty:
+        st.subheader(translate("classification_report"))
+        st.dataframe(
+            report_frame,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "precision": st.column_config.ProgressColumn("Precision", format="%.3f", min_value=0, max_value=1),
+                "recall": st.column_config.ProgressColumn("Recall", format="%.3f", min_value=0, max_value=1),
+                "f1_score": st.column_config.ProgressColumn("F1", format="%.3f", min_value=0, max_value=1),
+                "support": st.column_config.NumberColumn("Support", format="%d"),
+            },
+        )
+
+    recommendations = metrics.get("model_recommendations") or build_default_ml_recommendations(
+        metrics,
+        feature_importance,
+    )
+    if recommendations:
+        st.subheader(translate("model_recommendations"))
+        render_recommendation_cards(recommendations)
 
     if not feature_importance.empty:
         st.subheader(translate("feature_importance"))
+        st.caption(translate("feature_importance_help"))
         chart_data = feature_importance[["feature", "importance"]]
-        render_bar_chart(chart_data, "feature", "importance", y_title="Importance", x_tick_angle=-20, height=360)
+        render_bar_chart(chart_data, "feature", "importance", y_title="Importance", x_tick_angle=-15, height=390)
         st.dataframe(
             feature_importance,
             use_container_width=True,
