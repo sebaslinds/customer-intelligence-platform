@@ -144,6 +144,26 @@ TRANSLATIONS = {
         ),
         "model_recommendations": "Model Recommendations",
         "no_curve_data": "Run the ML training pipeline again to generate curve and threshold data.",
+        "model_card": "Model Card",
+        "model_card_task": "Prediction task",
+        "model_card_task_value": "Binary reorder classification",
+        "model_card_target": "Target",
+        "model_card_target_value": "will_reorder: whether a future order contains at least one reordered item",
+        "model_card_model": "Model",
+        "model_card_model_value": "RandomForestClassifier with balanced class weights",
+        "model_card_use_case": "Business use case",
+        "model_card_use_case_value": "Support retention campaigns, reorder nudges, and customer prioritization.",
+        "model_card_features": "Main features",
+        "model_card_features_value": "Order count, basket size, reorder ratio, product breadth, and order interval.",
+        "model_card_limitations": "Limitations",
+        "model_card_limitations_value": (
+            "Instacart does not include prices, margins, demographics, or real campaign outcomes. "
+            "Use the score as decision support, not as a fully automated targeting rule."
+        ),
+        "model_card_monitoring": "Monitoring guidance",
+        "model_card_monitoring_value": (
+            "Track recall, precision, balanced accuracy, positive rate, and threshold behavior after each retrain."
+        ),
         "ai_copilot": "AI Copilot",
         "ai_business_copilot": "AI Business Copilot",
         "ai_copilot_caption": "Ask business questions about churn, reorders, products, retention, and customer behavior.",
@@ -321,6 +341,26 @@ TRANSLATIONS = {
         ),
         "model_recommendations": "Recommandations modele",
         "no_curve_data": "Relance le pipeline ML pour generer les courbes et l'analyse des seuils.",
+        "model_card": "Fiche modele",
+        "model_card_task": "Tache de prediction",
+        "model_card_task_value": "Classification binaire de recommande",
+        "model_card_target": "Target",
+        "model_card_target_value": "will_reorder: indique si une future commande contient au moins un produit recommande",
+        "model_card_model": "Modele",
+        "model_card_model_value": "RandomForestClassifier avec poids de classes equilibres",
+        "model_card_use_case": "Usage business",
+        "model_card_use_case_value": "Aider les campagnes de retention, les nudges de recommande et la priorisation client.",
+        "model_card_features": "Features principales",
+        "model_card_features_value": "Nombre de commandes, taille du panier, ratio de recommande, diversite produits et delai entre commandes.",
+        "model_card_limitations": "Limites",
+        "model_card_limitations_value": (
+            "Instacart ne contient pas les prix, les marges, la demographie ni les resultats reels de campagnes. "
+            "Le score doit servir d'aide a la decision, pas de regle de ciblage entierement automatisee."
+        ),
+        "model_card_monitoring": "Suivi recommande",
+        "model_card_monitoring_value": (
+            "Surveiller recall, precision, accuracy equilibree, taux positif et comportement des seuils apres chaque retraining."
+        ),
         "ai_copilot": "Copilot IA",
         "ai_business_copilot": "Copilot Business IA",
         "ai_copilot_caption": "Pose des questions business sur le churn, les recommandes, les produits, la retention et les clients.",
@@ -1412,12 +1452,34 @@ def render_model_summary_cards(metrics: dict[str, Any], feature_importance: pd.D
         col_c.metric("Top Driver", top_feature)
 
 
+def render_model_card() -> None:
+    model_card_items = [
+        ("model_card_task", "model_card_task_value"),
+        ("model_card_target", "model_card_target_value"),
+        ("model_card_model", "model_card_model_value"),
+        ("model_card_use_case", "model_card_use_case_value"),
+        ("model_card_features", "model_card_features_value"),
+        ("model_card_limitations", "model_card_limitations_value"),
+        ("model_card_monitoring", "model_card_monitoring_value"),
+    ]
+
+    with st.container(border=True):
+        st.markdown(f"**{translate('model_card')}**")
+        left_column, right_column = st.columns(2)
+        for index, (label_key, value_key) in enumerate(model_card_items):
+            target_column = left_column if index % 2 == 0 else right_column
+            with target_column:
+                st.caption(translate(label_key))
+                st.write(translate(value_key))
+
+
 def render_model_performance(metrics: dict[str, Any], feature_importance: pd.DataFrame) -> None:
     st.subheader(translate("model_performance"))
     if not metrics:
         st.info(translate("no_model_metrics"))
         return
 
+    render_model_card()
     render_model_summary_cards(metrics, feature_importance)
 
     accuracy, balanced_accuracy, precision, recall, f1_score, roc_auc = st.columns(6)
