@@ -1979,15 +1979,14 @@ def main() -> None:
 
     try:
         kpis = load_kpis()
-        customers = load_customer_insights()
-        products = load_product_trends()
-        model_metrics = load_model_metrics()
-        feature_importance = load_feature_importance()
     except Exception as exc:
-        logger.exception("Failed to load dashboard data")
-        st.error("Unable to load dashboard data from Snowflake.")
-        st.exception(exc)
-        return
+        logger.exception("Failed to load dashboard KPIs")
+        st.warning("Unable to load live Snowflake KPIs. Showing empty defaults while the app remains available.")
+        st.caption(str(exc))
+        kpis = {"total_orders": 0, "revenue_proxy": 0, "reorder_rate": 0}
+
+    model_metrics = load_model_metrics()
+    feature_importance = load_feature_importance()
 
     render_kpis(kpis)
     st.divider()
@@ -2016,9 +2015,19 @@ def main() -> None:
     with overview_tab:
         render_project_overview()
     with customer_tab:
-        render_customer_insights(customers)
+        try:
+            render_customer_insights(load_customer_insights())
+        except Exception as exc:
+            logger.exception("Failed to load customer insights")
+            st.error("Unable to load customer insights from Snowflake.")
+            st.caption(str(exc))
     with product_tab:
-        render_product_trends(products)
+        try:
+            render_product_trends(load_product_trends())
+        except Exception as exc:
+            logger.exception("Failed to load product trends")
+            st.error("Unable to load product trends from Snowflake.")
+            st.caption(str(exc))
     with quality_tab:
         render_data_quality()
     with health_tab:

@@ -1,6 +1,6 @@
 feature,importance
-total_orders,0.5105750447636571
-days_between_orders,0.489424955236343
+total_orders,0.8708829338743703
+days_between_orders,0.12911706612562962
 avg_basket_size,0.0
 reorder_ratio,0.0
 unique_products,0.0
