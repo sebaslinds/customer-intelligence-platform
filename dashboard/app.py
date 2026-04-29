@@ -543,24 +543,55 @@ def load_kpis() -> dict[str, Any]:
     return frame.iloc[0].to_dict()
 
 
+FEATURE_STORE_COLUMN_TYPES = {
+    "user_id": "number",
+    "total_orders": "number",
+    "observed_basket_orders": "number",
+    "avg_basket_size": "float",
+    "stddev_basket_size": "float",
+    "reorder_ratio": "float",
+    "reorder_order_ratio": "float",
+    "unique_products": "number",
+    "days_between_orders": "float",
+    "stddev_days_between_orders": "float",
+    "customer_tenure_days": "float",
+    "order_frequency_30d": "float",
+    "avg_order_hour_of_day": "float",
+    "weekend_order_ratio": "float",
+    "evening_order_ratio": "float",
+}
+
+
+def load_table_columns(table_name: str) -> set[str]:
+    query = f"""
+        select lower(column_name) as column_name
+        from information_schema.columns
+        where table_schema = current_schema()
+            and lower(table_name) = lower('{table_name}')
+    """
+    frame = query_snowflake(query)
+    if frame.empty:
+        return set()
+    return set(frame["column_name"].astype(str))
+
+
+def build_feature_store_select_columns(existing_columns: set[str]) -> str:
+    select_parts = []
+    for column_name, column_type in FEATURE_STORE_COLUMN_TYPES.items():
+        if column_name in existing_columns:
+            select_parts.append(f"            {column_name}")
+        else:
+            select_parts.append(f"            cast(null as {column_type}) as {column_name}")
+
+    return ",\n".join(select_parts)
+
+
 def load_customer_insights() -> pd.DataFrame:
-    query = """
+    existing_columns = load_table_columns("feature_store")
+    select_columns = build_feature_store_select_columns(existing_columns)
+    query = f"""
         select
-            user_id,
-            total_orders,
-            observed_basket_orders,
-            avg_basket_size,
-            stddev_basket_size,
-            reorder_ratio,
-            reorder_order_ratio,
-            unique_products,
-            days_between_orders,
-            stddev_days_between_orders,
-            customer_tenure_days,
-            order_frequency_30d,
-            avg_order_hour_of_day,
-            weekend_order_ratio,
-            evening_order_ratio
+{select_columns}
         from feature_store
         order by total_orders desc, user_id
         limit 25
