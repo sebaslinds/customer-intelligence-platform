@@ -1,4 +1,4 @@
-from api.copilot import classify_question, generate_local_insights
+from services.ai.copilot_service import classify_question, generate_local_insights
 
 
 def test_retention_question_uses_retention_fallback() -> None:

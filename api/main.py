@@ -4,7 +4,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from api.v1.router import api_router
-from api.copilot import router as copilot_router
 from config.logging_config import configure_logging
 from config.production import validate_production_settings
 from config.settings import get_settings
@@ -33,8 +32,8 @@ app = FastAPI(
     description="API surface for customer analytics and intelligence workflows.",
     lifespan=lifespan,
 )
-app.include_router(copilot_router)
 app.include_router(api_router)
+
 
 @app.get("/health", tags=["system"])
 def health_check() -> dict[str, str | bool]:

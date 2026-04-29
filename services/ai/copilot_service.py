@@ -1,61 +1,22 @@
 import json
 import logging
-from typing import Any, Literal
+from typing import Any
 
 import pandas as pd
-from fastapi import APIRouter, HTTPException, status
 from openai import OpenAI, OpenAIError
-from pydantic import BaseModel, Field
 from sqlalchemy import Engine, text
 
 from config.settings import get_settings
 from ingestion.snowflake_client import build_snowflake_engine
+from schemas.copilot import (
+    CopilotResponse,
+    ImpactedSegment,
+    Insight,
+    InsightCategory,
+    Recommendation,
+)
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/copilot", tags=["copilot"])
-
-InsightCategory = Literal["churn", "reorder_trend", "top_products", "customer_behavior", "retention", "clv", "general"]
-ImpactLevel = Literal["low", "medium", "high"]
-AIResponseSource = Literal["openai", "local_fallback"]
-
-
-class CopilotRequest(BaseModel):
-    question: str = Field(..., min_length=3, max_length=500)
-
-
-class Insight(BaseModel):
-    title: str
-    category: InsightCategory
-    finding: str
-    evidence: list[str]
-    impact: ImpactLevel
-    recommended_action: str
-
-
-class ImpactedSegment(BaseModel):
-    segment_name: str
-    metric: str
-    value: str
-    why_it_matters: str
-
-
-class Recommendation(BaseModel):
-    action: str
-    expected_impact: str
-    priority: ImpactLevel
-
-
-class CopilotResponse(BaseModel):
-    question: str
-    ai_source: AIResponseSource = "local_fallback"
-    ai_source_detail: str | None = None
-    summary: str
-    explanation: str
-    impacted_segments: list[ImpactedSegment]
-    recommendations: list[Recommendation]
-    insights: list[Insight]
-    follow_up_questions: list[str]
-    data_sources: list[str]
 
 
 def classify_question(question: str) -> InsightCategory:
@@ -841,14 +802,3 @@ def answer_business_question(question: str) -> CopilotResponse:
         raise
     finally:
         engine.dispose()
-
-
-@router.post("/insights", response_model=CopilotResponse)
-def create_copilot_insights(payload: CopilotRequest) -> CopilotResponse:
-    try:
-        return answer_business_question(payload.question)
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to generate copilot insights.",
-        ) from exc
