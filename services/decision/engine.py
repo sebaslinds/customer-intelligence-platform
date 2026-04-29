@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 DecisionPriority = Literal["low", "medium", "high", "critical"]
 DecisionType = Literal["alert", "recommendation"]
+DecisionLanguage = Literal["en", "fr"]
 
 
 class Anomaly(BaseModel):
@@ -23,6 +24,7 @@ class DecisionRequest(BaseModel):
     data: dict[str, Any] = Field(default_factory=dict)
     anomalies: list[Anomaly] = Field(default_factory=list)
     use_gemini: bool = True
+    language: DecisionLanguage = "en"
 
 
 class Decision(BaseModel):
@@ -46,10 +48,135 @@ class DecisionResponse(BaseModel):
 
 
 PRIORITY_SCORE = {"low": 1, "medium": 2, "high": 3, "critical": 4}
+PRIORITY_LABELS_FR = {
+    "low": "faible",
+    "medium": "moyenne",
+    "high": "elevee",
+    "critical": "critique",
+}
+
+DECISION_TEXT_FR = {
+    "Reorder rate is below the healthy operating threshold.": (
+        "Le taux de recommande est sous le seuil operationnel sain."
+    ),
+    "Churn risk is critically high.": "Le risque de churn est critique.",
+    "Churn risk is elevated.": "Le risque de churn est eleve.",
+    "Average purchase gap is unusually long.": "Le delai moyen entre commandes est anormalement long.",
+    "Data quality checks are failing before downstream decisions.": (
+        "Des controles de qualite des donnees echouent avant les decisions downstream."
+    ),
+    "Serving API is unavailable or unhealthy.": "L'API de service est indisponible ou non saine.",
+    "Pause downstream analytics refresh": "Suspendre le rafraichissement analytique downstream",
+    "Investigate failing data quality checks before running dbt, training, or dashboard refreshes.": (
+        "Analyser les controles qualite en echec avant de lancer dbt, le training ou le "
+        "rafraichissement du dashboard."
+    ),
+    "Data quality failures can contaminate marts, model features, and AI insights.": (
+        "Les echecs de qualite peuvent contaminer les marts, les features modele et les insights IA."
+    ),
+    "Restore prediction API availability": "Restaurer la disponibilite de l'API de prediction",
+    "Check Render logs, health endpoint, model artifact availability, and environment variables.": (
+        "Verifier les logs Render, le endpoint health, la disponibilite de l'artefact modele "
+        "et les variables d'environnement."
+    ),
+    "The decision and dashboard layers depend on the API for live predictions and copilot workflows.": (
+        "Les couches decision et dashboard dependent de l'API pour les predictions live et "
+        "les workflows copilot."
+    ),
+    "Launch retention intervention": "Lancer une intervention de retention",
+    "Target high-risk customers with reorder reminders, high-repeat products, and time-bound offers.": (
+        "Cibler les clients a risque avec des rappels de recommande, des produits a fort rachat "
+        "et des offres limitees dans le temps."
+    ),
+    "Churn risk, weak reorder behavior, or long purchase gaps indicate declining customer engagement.": (
+        "Le risque de churn, la faiblesse des recommandes ou les longs delais entre commandes "
+        "indiquent une baisse d'engagement client."
+    ),
+    "Review revenue proxy decline": "Analyser la baisse du proxy de revenus",
+    "Compare order volume, basket size, and repeat purchase movement by cohort and product department.": (
+        "Comparer le volume de commandes, la taille du panier et les rachats par cohorte "
+        "et departement produit."
+    ),
+    "A declining revenue proxy can signal lower basket activity even without price-level data.": (
+        "Une baisse du proxy de revenus peut indiquer une baisse d'activite panier meme sans "
+        "donnees de prix."
+    ),
+    "Continue monitoring customer health": "Continuer le suivi de la sante client",
+    "Track reorder rate, retention cohorts, churn risk, and data quality daily.": (
+        "Suivre chaque jour le taux de recommande, les cohortes de retention, le risque de churn "
+        "et la qualite des donnees."
+    ),
+    "No critical anomaly was detected, so the best decision is ongoing monitoring.": (
+        "Aucune anomalie critique n'a ete detectee; la meilleure decision est donc de continuer "
+        "la surveillance."
+    ),
+}
+
+DETAIL_TEXT_FR = {
+    "Gemini was not requested for this run.": "Gemini n'a pas ete demande pour cette execution.",
+    "GEMINI_API_KEY is not configured on the API service.": (
+        "GEMINI_API_KEY n'est pas configuree sur le service API."
+    ),
+    "Gemini returned no text in the response.": "Gemini n'a retourne aucun texte.",
+    "Gemini returned an unexpected response shape.": "Gemini a retourne une reponse au format inattendu.",
+    "Gemini was requested but did not return text.": "Gemini a ete demande, mais n'a retourne aucun texte.",
+}
 
 
 def normalize_priority(*priorities: DecisionPriority) -> DecisionPriority:
     return max(priorities or ("low",), key=lambda priority: PRIORITY_SCORE[priority])
+
+
+def translate_decision_text(value: str | None, language: DecisionLanguage) -> str | None:
+    if value is None or language != "fr":
+        return value
+    return DECISION_TEXT_FR.get(value, value)
+
+
+def translate_detail_text(value: str | None, language: DecisionLanguage) -> str | None:
+    if value is None or language != "fr":
+        return value
+    if value.startswith("Generated with "):
+        model_name = value.removeprefix("Generated with ").removesuffix(".")
+        return f"Genere avec {model_name}."
+    if value.startswith("Gemini request failed with HTTP status "):
+        status_code = value.removeprefix("Gemini request failed with HTTP status ").removesuffix(".")
+        return f"La requete Gemini a echoue avec le statut HTTP {status_code}."
+    if value.startswith("Gemini request failed: "):
+        error_name = value.removeprefix("Gemini request failed: ").removesuffix(".")
+        return f"La requete Gemini a echoue: {error_name}."
+    return DETAIL_TEXT_FR.get(value, value)
+
+
+def localize_anomalies(anomalies: list[Anomaly], language: DecisionLanguage) -> list[Anomaly]:
+    if language != "fr":
+        return anomalies
+    return [
+        anomaly.model_copy(update={"description": translate_decision_text(anomaly.description, language)})
+        for anomaly in anomalies
+    ]
+
+
+def localize_decisions(decisions: list[Decision], language: DecisionLanguage) -> list[Decision]:
+    if language != "fr":
+        return decisions
+
+    localized_decisions: list[Decision] = []
+    for decision in decisions:
+        evidence = dict(decision.evidence)
+        if "description" in evidence:
+            evidence["description"] = translate_decision_text(str(evidence["description"]), language)
+        localized_decisions.append(
+            decision.model_copy(
+                update={
+                    "title": translate_decision_text(decision.title, language),
+                    "action": translate_decision_text(decision.action, language),
+                    "rationale": translate_decision_text(decision.rationale, language),
+                    "evidence": evidence,
+                }
+            )
+        )
+    return localized_decisions
 
 
 def as_float(value: Any, default: float = 0.0) -> float:
@@ -220,21 +347,44 @@ def build_decisions(data: dict[str, Any], anomalies: list[Anomaly]) -> list[Deci
     return sorted(decisions, key=lambda decision: PRIORITY_SCORE[decision.priority], reverse=True)
 
 
-def build_local_explanation(decisions: list[Decision], anomalies: list[Anomaly]) -> str:
+def build_local_explanation(
+    decisions: list[Decision],
+    anomalies: list[Anomaly],
+    language: DecisionLanguage = "en",
+) -> str:
     highest_priority = decisions[0].priority if decisions else "low"
     anomaly_count = len(anomalies)
     top_decision = decisions[0].title if decisions else "Continue monitoring"
+    if language == "fr":
+        priority_label = PRIORITY_LABELS_FR.get(highest_priority, highest_priority)
+        return (
+            f"Le moteur de decision a produit {len(decisions)} decision(s) a partir de "
+            f"{anomaly_count} signal(aux) d'anomalie. La priorite la plus elevee est "
+            f"{priority_label}. Premiere action recommandee: {top_decision}."
+        )
     return (
         f"Decision engine produced {len(decisions)} decision(s) from {anomaly_count} anomaly signal(s). "
         f"The highest priority is {highest_priority}. Recommended first action: {top_decision}."
     )
 
 
-def build_gemini_prompt(data: dict[str, Any], anomalies: list[Anomaly], decisions: list[Decision]) -> str:
+def build_gemini_prompt(
+    data: dict[str, Any],
+    anomalies: list[Anomaly],
+    decisions: list[Decision],
+    language: DecisionLanguage = "en",
+) -> str:
+    language_instruction = (
+        "Respond in French. Keep metric names such as reorder_rate, churn_rate, and days_between_orders unchanged. "
+        "Translate business explanations, recommendations, and actions into French."
+        if language == "fr"
+        else "Respond in English."
+    )
     return (
         "You are a decision engine for a customer intelligence data platform. "
         "Explain the decisions concisely for a business stakeholder. Use only the supplied data. "
         "Mention the highest priority, why it matters, and what should happen next.\n\n"
+        f"{language_instruction}\n\n"
         f"Data: {data}\n"
         f"Anomalies: {[anomaly.model_dump() for anomaly in anomalies]}\n"
         f"Decisions: {[decision.model_dump() for decision in decisions]}"
@@ -246,9 +396,10 @@ def explain_with_gemini(
     anomalies: list[Anomaly],
     decisions: list[Decision],
     settings: Settings,
+    language: DecisionLanguage = "en",
 ) -> tuple[str | None, str | None]:
     if not settings.gemini_api_key:
-        return None, "GEMINI_API_KEY is not configured on the API service."
+        return None, translate_detail_text("GEMINI_API_KEY is not configured on the API service.", language)
 
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
@@ -259,7 +410,12 @@ def explain_with_gemini(
             {
                 "parts": [
                     {
-                        "text": build_gemini_prompt(data=data, anomalies=anomalies, decisions=decisions),
+                        "text": build_gemini_prompt(
+                            data=data,
+                            anomalies=anomalies,
+                            decisions=decisions,
+                            language=language,
+                        ),
                     }
                 ]
             }
@@ -278,20 +434,23 @@ def explain_with_gemini(
         candidates = body.get("candidates") or []
         parts = candidates[0].get("content", {}).get("parts", []) if candidates else []
         if parts and parts[0].get("text"):
-            return str(parts[0]["text"]).strip(), f"Generated with {settings.gemini_model}."
-        return None, "Gemini returned no text in the response."
+            return str(parts[0]["text"]).strip(), translate_detail_text(
+                f"Generated with {settings.gemini_model}.",
+                language,
+            )
+        return None, translate_detail_text("Gemini returned no text in the response.", language)
     except requests.HTTPError as exc:
         status_code = exc.response.status_code if exc.response is not None else "unknown"
         logger.exception("Gemini explanation request failed")
-        return None, f"Gemini request failed with HTTP status {status_code}."
+        return None, translate_detail_text(f"Gemini request failed with HTTP status {status_code}.", language)
     except requests.RequestException as exc:
         logger.exception("Gemini explanation request failed")
-        return None, f"Gemini request failed: {exc.__class__.__name__}."
+        return None, translate_detail_text(f"Gemini request failed: {exc.__class__.__name__}.", language)
     except (KeyError, IndexError, TypeError):
         logger.exception("Gemini response shape was unexpected")
-        return None, "Gemini returned an unexpected response shape."
+        return None, translate_detail_text("Gemini returned an unexpected response shape.", language)
 
-    return None, "Gemini was requested but did not return text."
+    return None, translate_detail_text("Gemini was requested but did not return text.", language)
 
 
 def run_decision_engine(payload: DecisionRequest, settings: Settings | None = None) -> DecisionResponse:
@@ -299,22 +458,31 @@ def run_decision_engine(payload: DecisionRequest, settings: Settings | None = No
     detected_anomalies = detect_anomalies(payload.data)
     anomalies = payload.anomalies + detected_anomalies
     decisions = build_decisions(payload.data, anomalies)
+    localized_anomalies = localize_anomalies(anomalies, payload.language)
+    localized_decisions = localize_decisions(decisions, payload.language)
 
     explanation = None
-    explanation_detail = "Gemini was not requested for this run."
+    explanation_detail = translate_detail_text("Gemini was not requested for this run.", payload.language)
     explanation_source: Literal["gemini", "local_fallback"] = "local_fallback"
     gemini_configured = bool(runtime_settings.gemini_api_key)
     if payload.use_gemini:
-        explanation, explanation_detail = explain_with_gemini(payload.data, anomalies, decisions, runtime_settings)
+        explanation, explanation_detail = explain_with_gemini(
+            payload.data,
+            localized_anomalies,
+            localized_decisions,
+            runtime_settings,
+            language=payload.language,
+        )
         if explanation:
             explanation_source = "gemini"
 
     return DecisionResponse(
-        decisions=decisions,
-        explanation=explanation or build_local_explanation(decisions, anomalies),
+        decisions=localized_decisions,
+        explanation=explanation
+        or build_local_explanation(localized_decisions, localized_anomalies, payload.language),
         explanation_source=explanation_source,
         explanation_detail=explanation_detail,
         gemini_requested=payload.use_gemini,
         gemini_configured=gemini_configured,
-        anomalies=anomalies,
+        anomalies=localized_anomalies,
     )

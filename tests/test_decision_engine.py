@@ -66,3 +66,25 @@ def test_decision_engine_explains_missing_gemini_key() -> None:
     assert response.gemini_configured is False
     assert response.explanation_detail is not None
     assert "GEMINI_API_KEY" in response.explanation_detail
+
+
+def test_decision_engine_localizes_french_response() -> None:
+    response = run_decision_engine(
+        DecisionRequest(
+            data={
+                "reorder_rate": 0.20,
+                "churn_rate": 0.60,
+                "days_between_orders": 25,
+            },
+            use_gemini=False,
+            language="fr",
+        ),
+        settings=Settings(gemini_api_key=None),
+    )
+
+    assert response.explanation_source == "local_fallback"
+    assert "moteur de decision" in response.explanation.lower()
+    assert response.decisions[0].title == "Lancer une intervention de retention"
+    assert "Cibler les clients a risque" in response.decisions[0].action
+    assert response.anomalies[0].description is not None
+    assert "Reorder rate is below" not in response.anomalies[0].description

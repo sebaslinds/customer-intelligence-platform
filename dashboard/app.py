@@ -81,6 +81,46 @@ TRANSLATIONS = {
             "for resilience when OpenAI is unavailable."
         ),
         "customer_insights": "Customer Insights",
+        "customer_insights_caption": (
+            "This view summarizes customer behavior by segment instead of ranking only the highest-order users."
+        ),
+        "customer_data_context": (
+            "Important context: Instacart order history is capped at 100 observed orders per user, so many users "
+            "show exactly 100 orders. Basket and product metrics are also based on the available order-product "
+            "detail, so the page highlights data coverage and behavior segments instead of treating 100 orders "
+            "as a literal lifetime total."
+        ),
+        "total_customers": "Customers",
+        "avg_orders": "Avg Orders",
+        "observed_baskets": "Observed Baskets",
+        "avg_basket_size": "Avg Basket Size",
+        "reorder_order_ratio": "Reorder Order Ratio",
+        "days_between_orders": "Days Between Orders",
+        "order_cap_share": "At 100-Order Cap",
+        "avg_observed_coverage": "Basket Coverage",
+        "avg_reorder_ratio": "Avg Reorder Ratio",
+        "unique_products": "Unique Products",
+        "monthly_frequency": "Monthly Frequency",
+        "customer_segment_summary": "Customer Segment Summary",
+        "customer_segment_summary_caption": (
+            "Segments combine reorder behavior, purchase interval, product breadth, and data coverage. "
+            "They are more useful than a simple top-user ranking."
+        ),
+        "customer_distribution": "Order Distribution",
+        "customer_behavior_map": "Customer Behavior Map",
+        "customer_behavior_map_caption": (
+            "Each point is a representative customer sample. The x-axis shows observed order frequency, "
+            "the y-axis shows reorder intensity, and point size reflects product breadth."
+        ),
+        "representative_customers": "Representative Customers",
+        "customer_segment": "Customer Segment",
+        "users": "Users",
+        "observed_basket_coverage": "Observed Basket Coverage",
+        "limited_basket_detail": "Limited basket detail",
+        "loyal_reorder": "Loyal reorder customers",
+        "at_risk_customer": "At-risk customers",
+        "product_explorer": "Product explorers",
+        "steady_customer": "Steady customers",
         "no_customer_data": "No customer feature data found. Run the dbt feature_store model first.",
         "product_trends": "Product Trends",
         "no_product_data": "No product data found. Run the dim_products dbt model first.",
@@ -316,6 +356,47 @@ TRANSLATIONS = {
             "si OpenAI n'est pas disponible."
         ),
         "customer_insights": "Insights Clients",
+        "customer_insights_caption": (
+            "Cette vue resume le comportement client par segment au lieu de classer seulement les utilisateurs "
+            "avec le plus de commandes."
+        ),
+        "customer_data_context": (
+            "Contexte important: l'historique Instacart est plafonne a 100 commandes observees par utilisateur. "
+            "Il est donc normal de voir plusieurs clients a exactement 100 commandes. Les metriques panier et "
+            "produit reposent aussi sur le detail order-product disponible; la page met donc l'accent sur la "
+            "couverture des donnees et les segments comportementaux."
+        ),
+        "total_customers": "Clients",
+        "avg_orders": "Commandes moyennes",
+        "observed_baskets": "Paniers observes",
+        "avg_basket_size": "Taille moyenne du panier",
+        "reorder_order_ratio": "Ratio de commandes avec recommande",
+        "days_between_orders": "Jours entre commandes",
+        "order_cap_share": "Au plafond de 100",
+        "avg_observed_coverage": "Couverture panier",
+        "avg_reorder_ratio": "Taux moyen de recommande",
+        "unique_products": "Produits uniques",
+        "monthly_frequency": "Frequence mensuelle",
+        "customer_segment_summary": "Resume des segments clients",
+        "customer_segment_summary_caption": (
+            "Les segments combinent comportement de recommande, delai entre commandes, diversite produits et "
+            "couverture des donnees. C'est plus utile qu'un simple classement des meilleurs utilisateurs."
+        ),
+        "customer_distribution": "Distribution des commandes",
+        "customer_behavior_map": "Carte comportementale client",
+        "customer_behavior_map_caption": (
+            "Chaque point est un client d'un echantillon representatif. L'axe x montre la frequence observee, "
+            "l'axe y l'intensite de recommande, et la taille du point reflete la diversite produits."
+        ),
+        "representative_customers": "Clients representatifs",
+        "customer_segment": "Segment client",
+        "users": "Utilisateurs",
+        "observed_basket_coverage": "Couverture panier observee",
+        "limited_basket_detail": "Detail panier limite",
+        "loyal_reorder": "Clients fideles en recommande",
+        "at_risk_customer": "Clients a risque",
+        "product_explorer": "Explorateurs produits",
+        "steady_customer": "Clients stables",
         "no_customer_data": "Aucune donnee client trouvee. Lance d'abord le modele dbt feature_store.",
         "product_trends": "Tendances Produits",
         "no_product_data": "Aucune donnee produit trouvee. Lance d'abord le modele dbt dim_products.",
@@ -555,10 +636,15 @@ FEATURE_STORE_COLUMN_TYPES = {
     "days_between_orders": "float",
     "stddev_days_between_orders": "float",
     "customer_tenure_days": "float",
+    "max_days_between_orders": "float",
+    "avg_order_dow": "float",
     "order_frequency_30d": "float",
     "avg_order_hour_of_day": "float",
     "weekend_order_ratio": "float",
     "evening_order_ratio": "float",
+    "active_order_dow_count": "number",
+    "observed_basket_coverage": "float",
+    "will_reorder": "number",
 }
 
 
@@ -586,15 +672,104 @@ def build_feature_store_select_columns(existing_columns: set[str]) -> str:
     return ",\n".join(select_parts)
 
 
+def customer_segment_case() -> str:
+    return """
+        case
+            when coalesce(observed_basket_coverage, 0) < 0.05 then 'limited_basket_detail'
+            when coalesce(reorder_ratio, 0) >= 0.60
+                and coalesce(total_orders, 0) >= 25 then 'loyal_reorder'
+            when coalesce(days_between_orders, 0) >= 21
+                or coalesce(reorder_ratio, 0) < 0.25 then 'at_risk_customer'
+            when coalesce(unique_products, 0) >= 15 then 'product_explorer'
+            else 'steady_customer'
+        end
+    """
+
+
+def feature_store_segmented_cte(existing_columns: set[str]) -> str:
+    select_columns = build_feature_store_select_columns(existing_columns)
+    segment_expression = customer_segment_case()
+    return f"""
+        with selected as (
+            select
+{select_columns}
+            from feature_store
+        ),
+
+        segmented as (
+            select
+                selected.*,
+                {segment_expression} as customer_segment
+            from selected
+        )
+    """
+
+
 def load_customer_insights() -> pd.DataFrame:
     existing_columns = load_table_columns("feature_store")
-    select_columns = build_feature_store_select_columns(existing_columns)
+    segmented_cte = feature_store_segmented_cte(existing_columns)
     query = f"""
+{segmented_cte},
+
+        sampled as (
+            select
+                segmented.*,
+                row_number() over (
+                    partition by customer_segment
+                    order by abs(hash(user_id))
+                ) as segment_sample_rank
+            from segmented
+        )
+
+        select *
+        from sampled
+        where segment_sample_rank <= 50
+        order by customer_segment, total_orders desc, user_id
+    """
+    return query_snowflake(query)
+
+
+def load_customer_profile_summary() -> dict[str, Any]:
+    existing_columns = load_table_columns("feature_store")
+    segmented_cte = feature_store_segmented_cte(existing_columns)
+    query = f"""
+{segmented_cte}
+
         select
-{select_columns}
-        from feature_store
-        order by total_orders desc, user_id
-        limit 25
+            count(*) as total_customers,
+            avg(total_orders) as avg_total_orders,
+            median(total_orders) as median_total_orders,
+            avg(reorder_ratio) as avg_reorder_ratio,
+            avg(observed_basket_coverage) as avg_observed_basket_coverage,
+            count_if(total_orders >= 100) / nullif(count(*), 0) as order_cap_share,
+            avg(days_between_orders) as avg_days_between_orders,
+            avg(unique_products) as avg_unique_products
+        from segmented
+    """
+    frame = query_snowflake(query)
+    if frame.empty:
+        return {}
+    return frame.iloc[0].to_dict()
+
+
+def load_customer_segment_summary() -> pd.DataFrame:
+    existing_columns = load_table_columns("feature_store")
+    segmented_cte = feature_store_segmented_cte(existing_columns)
+    query = f"""
+{segmented_cte}
+
+        select
+            customer_segment,
+            count(*) as users,
+            avg(total_orders) as avg_total_orders,
+            avg(reorder_ratio) as avg_reorder_ratio,
+            avg(observed_basket_coverage) as avg_observed_basket_coverage,
+            avg(unique_products) as avg_unique_products,
+            avg(days_between_orders) as avg_days_between_orders,
+            avg(order_frequency_30d) as avg_order_frequency_30d
+        from segmented
+        group by customer_segment
+        order by users desc
     """
     return query_snowflake(query)
 
@@ -939,6 +1114,100 @@ def translate_copilot_question(question: str) -> str:
     return question_map.get(question, question)
 
 
+DECISION_OUTPUT_TRANSLATIONS_FR = {
+    "alert": "Alerte",
+    "recommendation": "Recommandation",
+    "local_fallback": "Fallback local",
+    "gemini": "Gemini",
+    "Generated with gemini-2.5-flash.": "Genere avec gemini-2.5-flash.",
+    "Gemini was not requested for this run.": "Gemini n'a pas ete demande pour cette execution.",
+    "GEMINI_API_KEY is not configured on the API service.": (
+        "GEMINI_API_KEY n'est pas configuree sur le service API."
+    ),
+    "Reorder rate is below the healthy operating threshold.": (
+        "Le taux de recommande est sous le seuil operationnel sain."
+    ),
+    "Churn risk is critically high.": "Le risque de churn est critique.",
+    "Churn risk is elevated.": "Le risque de churn est eleve.",
+    "Average purchase gap is unusually long.": "Le delai moyen entre commandes est anormalement long.",
+    "Data quality checks are failing before downstream decisions.": (
+        "Des controles de qualite des donnees echouent avant les decisions downstream."
+    ),
+    "Serving API is unavailable or unhealthy.": "L'API de service est indisponible ou non saine.",
+    "Pause downstream analytics refresh": "Suspendre le rafraichissement analytique downstream",
+    "Investigate failing data quality checks before running dbt, training, or dashboard refreshes.": (
+        "Analyser les controles qualite en echec avant de lancer dbt, le training ou le "
+        "rafraichissement du dashboard."
+    ),
+    "Data quality failures can contaminate marts, model features, and AI insights.": (
+        "Les echecs de qualite peuvent contaminer les marts, les features modele et les insights IA."
+    ),
+    "Restore prediction API availability": "Restaurer la disponibilite de l'API de prediction",
+    "Check Render logs, health endpoint, model artifact availability, and environment variables.": (
+        "Verifier les logs Render, le endpoint health, la disponibilite de l'artefact modele "
+        "et les variables d'environnement."
+    ),
+    "The decision and dashboard layers depend on the API for live predictions and copilot workflows.": (
+        "Les couches decision et dashboard dependent de l'API pour les predictions live et "
+        "les workflows copilot."
+    ),
+    "Launch retention intervention": "Lancer une intervention de retention",
+    "Target high-risk customers with reorder reminders, high-repeat products, and time-bound offers.": (
+        "Cibler les clients a risque avec des rappels de recommande, des produits a fort rachat "
+        "et des offres limitees dans le temps."
+    ),
+    "Churn risk, weak reorder behavior, or long purchase gaps indicate declining customer engagement.": (
+        "Le risque de churn, la faiblesse des recommandes ou les longs delais entre commandes "
+        "indiquent une baisse d'engagement client."
+    ),
+    "Review revenue proxy decline": "Analyser la baisse du proxy de revenus",
+    "Compare order volume, basket size, and repeat purchase movement by cohort and product department.": (
+        "Comparer le volume de commandes, la taille du panier et les rachats par cohorte "
+        "et departement produit."
+    ),
+    "A declining revenue proxy can signal lower basket activity even without price-level data.": (
+        "Une baisse du proxy de revenus peut indiquer une baisse d'activite panier meme sans "
+        "donnees de prix."
+    ),
+    "Continue monitoring customer health": "Continuer le suivi de la sante client",
+    "Track reorder rate, retention cohorts, churn risk, and data quality daily.": (
+        "Suivre chaque jour le taux de recommande, les cohortes de retention, le risque de churn "
+        "et la qualite des donnees."
+    ),
+    "No critical anomaly was detected, so the best decision is ongoing monitoring.": (
+        "Aucune anomalie critique n'a ete detectee; la meilleure decision est donc de continuer "
+        "la surveillance."
+    ),
+}
+
+
+def translate_decision_output_text(value: Any) -> str:
+    text_value = "" if value is None else str(value)
+    if get_language() != "fr":
+        return text_value
+    if text_value.startswith("Gemini request failed with HTTP status "):
+        status_code = text_value.removeprefix("Gemini request failed with HTTP status ").removesuffix(".")
+        return f"La requete Gemini a echoue avec le statut HTTP {status_code}."
+    return DECISION_OUTPUT_TRANSLATIONS_FR.get(text_value, text_value)
+
+
+def translate_decision_record(record: dict[str, Any]) -> dict[str, Any]:
+    if get_language() != "fr":
+        return record
+
+    localized_record = dict(record)
+    for field_name in ("title", "action", "rationale", "description"):
+        if field_name in localized_record:
+            localized_record[field_name] = translate_decision_output_text(localized_record[field_name])
+    evidence = localized_record.get("evidence")
+    if isinstance(evidence, dict) and "description" in evidence:
+        localized_record["evidence"] = {
+            **evidence,
+            "description": translate_decision_output_text(evidence.get("description")),
+        }
+    return localized_record
+
+
 def toggle_language() -> None:
     st.session_state.language = "fr" if get_language() == "en" else "en"
     st.rerun()
@@ -1129,13 +1398,15 @@ def render_decision_cards(decisions: list[dict[str, Any]]) -> None:
     if not decisions:
         return
 
+    decisions = [translate_decision_record(decision) for decision in decisions]
     for row_start in range(0, len(decisions), 2):
         row_decisions = decisions[row_start : row_start + 2]
         columns = st.columns(len(row_decisions))
         for column, decision in zip(columns, row_decisions, strict=False):
             priority = str(decision.get("priority") or "low")
             with column.container(border=True):
-                st.caption(f"{format_priority_label(priority)} | {str(decision.get('decision_type') or '').title()}")
+                decision_type = translate_decision_output_text(decision.get("decision_type"))
+                st.caption(f"{format_priority_label(priority)} | {decision_type.title()}")
                 st.markdown(f"**{decision.get('title', '')}**")
                 if action := decision.get("action"):
                     st.write(action)
@@ -1304,53 +1575,257 @@ def render_kpis(kpis: dict[str, Any]) -> None:
     reorder_rate.metric(translate("reorder_rate"), format_percent(kpis.get("reorder_rate", 0)))
 
 
+def translate_customer_segment(segment: Any) -> str:
+    segment_key = str(segment or "steady_customer")
+    return translate(segment_key) if segment_key in TRANSLATIONS["en"] else segment_key.replace("_", " ").title()
+
+
+def build_customer_summary_from_sample(frame: pd.DataFrame) -> dict[str, Any]:
+    if frame.empty:
+        return {}
+
+    total_orders = pd.to_numeric(frame.get("total_orders"), errors="coerce")
+    reorder_ratio = pd.to_numeric(frame.get("reorder_ratio"), errors="coerce")
+    coverage = pd.to_numeric(frame.get("observed_basket_coverage"), errors="coerce")
+    days_between_orders = pd.to_numeric(frame.get("days_between_orders"), errors="coerce")
+    unique_products = pd.to_numeric(frame.get("unique_products"), errors="coerce")
+    return {
+        "total_customers": frame["user_id"].nunique() if "user_id" in frame else len(frame),
+        "avg_total_orders": total_orders.mean(),
+        "median_total_orders": total_orders.median(),
+        "avg_reorder_ratio": reorder_ratio.mean(),
+        "avg_observed_basket_coverage": coverage.mean(),
+        "order_cap_share": (total_orders >= 100).mean(),
+        "avg_days_between_orders": days_between_orders.mean(),
+        "avg_unique_products": unique_products.mean(),
+    }
+
+
+def render_customer_summary_cards(summary: dict[str, Any]) -> None:
+    total_customers, avg_orders, order_cap, basket_coverage, reorder_ratio = st.columns(5)
+    total_customers.metric(translate("total_customers"), format_number(summary.get("total_customers", 0)))
+    avg_orders.metric(translate("avg_orders"), format_number(summary.get("avg_total_orders", 0)))
+    order_cap.metric(translate("order_cap_share"), format_percent(summary.get("order_cap_share", 0)))
+    basket_coverage.metric(
+        translate("avg_observed_coverage"),
+        format_percent(summary.get("avg_observed_basket_coverage", 0)),
+    )
+    reorder_ratio.metric(translate("avg_reorder_ratio"), format_percent(summary.get("avg_reorder_ratio", 0)))
+
+
+def render_customer_segment_summary(segment_summary: pd.DataFrame) -> None:
+    if segment_summary.empty:
+        return
+
+    segment_frame = segment_summary.copy()
+    segment_frame["customer_segment_label"] = segment_frame["customer_segment"].map(translate_customer_segment)
+    segment_frame = segment_frame.sort_values("users", ascending=True)
+
+    st.markdown(f"**{translate('customer_segment_summary')}**")
+    st.caption(translate("customer_segment_summary_caption"))
+    chart_column, table_column = st.columns([1.1, 1])
+    with chart_column:
+        chart = (
+            alt.Chart(segment_frame)
+            .mark_bar(cornerRadiusTopRight=4, cornerRadiusBottomRight=4)
+            .encode(
+                y=alt.Y(
+                    "customer_segment_label:N",
+                    sort=None,
+                    axis=alt.Axis(title=None, labelLimit=220),
+                ),
+                x=alt.X("users:Q", axis=alt.Axis(title=translate("users"))),
+                color=alt.Color(
+                    "customer_segment_label:N",
+                    legend=None,
+                    scale=alt.Scale(range=["#2563eb", "#38bdf8", "#16a34a", "#f59e0b", "#7c3aed"]),
+                ),
+                tooltip=[
+                    alt.Tooltip("customer_segment_label:N", title=translate("customer_segment")),
+                    alt.Tooltip("users:Q", title=translate("users"), format=",.0f"),
+                    alt.Tooltip("avg_reorder_ratio:Q", title=translate("reorder_rate"), format=".1%"),
+                    alt.Tooltip("avg_observed_basket_coverage:Q", title=translate("observed_basket_coverage"), format=".1%"),
+                ],
+            )
+            .properties(height=320)
+        )
+        st.altair_chart(chart, use_container_width=True)
+    with table_column:
+        display_frame = segment_frame.sort_values("users", ascending=False)
+        st.dataframe(
+            display_frame[
+                [
+                    "customer_segment_label",
+                    "users",
+                    "avg_total_orders",
+                    "avg_reorder_ratio",
+                    "avg_observed_basket_coverage",
+                ]
+            ],
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "customer_segment_label": translate("customer_segment"),
+                "users": st.column_config.NumberColumn(translate("users"), format="%d"),
+                "avg_total_orders": st.column_config.NumberColumn(translate("avg_orders"), format="%.1f"),
+                "avg_reorder_ratio": st.column_config.ProgressColumn(
+                    translate("avg_reorder_ratio"),
+                    format="%.2f",
+                    min_value=0,
+                    max_value=1,
+                ),
+                "avg_observed_basket_coverage": st.column_config.ProgressColumn(
+                    translate("observed_basket_coverage"),
+                    format="%.2f",
+                    min_value=0,
+                    max_value=1,
+                ),
+            },
+        )
+
+
+def render_customer_behavior_charts(frame: pd.DataFrame) -> None:
+    chart_frame = frame.copy()
+    chart_frame["customer_segment_label"] = chart_frame["customer_segment"].map(translate_customer_segment)
+    numeric_columns = [
+        "total_orders",
+        "reorder_ratio",
+        "unique_products",
+        "observed_basket_coverage",
+        "days_between_orders",
+    ]
+    for column_name in numeric_columns:
+        chart_frame[column_name] = pd.to_numeric(chart_frame.get(column_name), errors="coerce")
+
+    st.markdown(f"**{translate('customer_behavior_map')}**")
+    st.caption(translate("customer_behavior_map_caption"))
+    distribution_column, scatter_column = st.columns([0.9, 1.25])
+    with distribution_column:
+        distribution = (
+            alt.Chart(chart_frame.dropna(subset=["total_orders"]))
+            .mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3)
+            .encode(
+                x=alt.X(
+                    "total_orders:Q",
+                    bin=alt.Bin(maxbins=18),
+                    axis=alt.Axis(title=translate("orders"), labelAngle=0),
+                ),
+                y=alt.Y("count():Q", axis=alt.Axis(title=translate("users"))),
+                tooltip=[
+                    alt.Tooltip("count():Q", title=translate("users")),
+                    alt.Tooltip("total_orders:Q", title=translate("orders"), bin=True),
+                ],
+            )
+            .properties(title=translate("customer_distribution"), height=360)
+        )
+        st.altair_chart(distribution, use_container_width=True)
+    with scatter_column:
+        scatter = (
+            alt.Chart(chart_frame.dropna(subset=["total_orders", "reorder_ratio"]))
+            .mark_circle(opacity=0.75)
+            .encode(
+                x=alt.X(
+                    "total_orders:Q",
+                    axis=alt.Axis(title=translate("orders"), labelAngle=0),
+                    scale=alt.Scale(zero=False),
+                ),
+                y=alt.Y(
+                    "reorder_ratio:Q",
+                    axis=alt.Axis(title=translate("reorder_rate"), format="%"),
+                    scale=alt.Scale(domain=[0, 1]),
+                ),
+                size=alt.Size("unique_products:Q", title=translate("unique_products"), scale=alt.Scale(range=[45, 420])),
+                color=alt.Color(
+                    "customer_segment_label:N",
+                    title=translate("customer_segment"),
+                    scale=alt.Scale(range=["#2563eb", "#38bdf8", "#16a34a", "#f59e0b", "#7c3aed"]),
+                ),
+                tooltip=[
+                    alt.Tooltip("user_id:N", title="User ID"),
+                    alt.Tooltip("customer_segment_label:N", title=translate("customer_segment")),
+                    alt.Tooltip("total_orders:Q", title=translate("orders"), format=",.0f"),
+                    alt.Tooltip("reorder_ratio:Q", title=translate("reorder_rate"), format=".1%"),
+                    alt.Tooltip("unique_products:Q", title=translate("unique_products"), format=",.0f"),
+                    alt.Tooltip("observed_basket_coverage:Q", title=translate("observed_basket_coverage"), format=".1%"),
+                ],
+            )
+            .properties(height=360)
+        )
+        st.altair_chart(scatter, use_container_width=True)
+
+
 def render_customer_insights(frame: pd.DataFrame) -> None:
     st.subheader(translate("customer_insights"))
     if frame.empty:
         st.info(translate("no_customer_data"))
         return
 
-    chart_data = frame.head(15).melt(
-        id_vars="user_id",
-        value_vars=["total_orders", "unique_products"],
-        var_name="metric",
-        value_name="value",
-    )
-    chart = (
-        alt.Chart(chart_data)
-        .mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3)
-        .encode(
-            x=alt.X("user_id:N", axis=alt.Axis(labelAngle=-25, labelLimit=120, title=None)),
-            xOffset="metric:N",
-            y=alt.Y("value:Q", axis=alt.Axis(title=None), scale=alt.Scale(zero=True)),
-            color=alt.Color("metric:N", scale=alt.Scale(range=["#2563eb", "#38bdf8"]), legend=alt.Legend(title=None)),
-            tooltip=[
-                alt.Tooltip("user_id:N", title="User ID"),
-                alt.Tooltip("metric:N", title="Metric"),
-                alt.Tooltip("value:Q", title="Value", format=",.0f"),
-            ],
-        )
-        .properties(height=380)
-    )
-    st.altair_chart(chart, use_container_width=True)
+    st.caption(translate("customer_insights_caption"))
+    st.info(translate("customer_data_context"))
 
+    try:
+        summary = load_customer_profile_summary()
+    except Exception:
+        logger.exception("Failed to load customer profile summary")
+        summary = build_customer_summary_from_sample(frame)
+    render_customer_summary_cards(summary or build_customer_summary_from_sample(frame))
+
+    st.divider()
+
+    try:
+        segment_summary = load_customer_segment_summary()
+    except Exception:
+        logger.exception("Failed to load customer segment summary")
+        segment_summary = pd.DataFrame()
+    render_customer_segment_summary(segment_summary)
+    render_customer_behavior_charts(frame)
+
+    table_frame = frame.copy()
+    table_frame["customer_segment_label"] = table_frame["customer_segment"].map(translate_customer_segment)
+    display_columns = [
+        "user_id",
+        "customer_segment_label",
+        "total_orders",
+        "observed_basket_orders",
+        "observed_basket_coverage",
+        "avg_basket_size",
+        "reorder_ratio",
+        "reorder_order_ratio",
+        "unique_products",
+        "days_between_orders",
+        "order_frequency_30d",
+    ]
+    display_columns = [column_name for column_name in display_columns if column_name in table_frame.columns]
+    st.markdown(f"**{translate('representative_customers')}**")
     st.dataframe(
-        frame,
+        table_frame[display_columns],
         use_container_width=True,
         hide_index=True,
         column_config={
             "user_id": "User ID",
-            "total_orders": st.column_config.NumberColumn("Total Orders", format="%d"),
-            "observed_basket_orders": st.column_config.NumberColumn("Observed Baskets", format="%d"),
-            "avg_basket_size": st.column_config.NumberColumn("Avg Basket Size", format="%.2f"),
+            "customer_segment_label": translate("customer_segment"),
+            "total_orders": st.column_config.NumberColumn(translate("orders"), format="%d"),
+            "observed_basket_orders": st.column_config.NumberColumn(translate("observed_baskets"), format="%d"),
+            "observed_basket_coverage": st.column_config.ProgressColumn(
+                translate("observed_basket_coverage"),
+                format="%.2f",
+                min_value=0,
+                max_value=1,
+            ),
+            "avg_basket_size": st.column_config.NumberColumn(translate("avg_basket_size"), format="%.2f"),
             "stddev_basket_size": st.column_config.NumberColumn("Basket Variability", format="%.2f"),
             "reorder_ratio": st.column_config.ProgressColumn("Reorder Ratio", format="%.2f", min_value=0, max_value=1),
-            "reorder_order_ratio": st.column_config.ProgressColumn("Reorder Order Ratio", format="%.2f", min_value=0, max_value=1),
-            "unique_products": st.column_config.NumberColumn("Unique Products", format="%d"),
-            "days_between_orders": st.column_config.NumberColumn("Days Between Orders", format="%.2f"),
+            "reorder_order_ratio": st.column_config.ProgressColumn(
+                translate("reorder_order_ratio"),
+                format="%.2f",
+                min_value=0,
+                max_value=1,
+            ),
+            "unique_products": st.column_config.NumberColumn(translate("unique_products"), format="%d"),
+            "days_between_orders": st.column_config.NumberColumn(translate("days_between_orders"), format="%.2f"),
             "stddev_days_between_orders": st.column_config.NumberColumn("Gap Variability", format="%.2f"),
             "customer_tenure_days": st.column_config.NumberColumn("Tenure Days", format="%.0f"),
-            "order_frequency_30d": st.column_config.NumberColumn("Monthly Frequency", format="%.2f"),
+            "order_frequency_30d": st.column_config.NumberColumn(translate("monthly_frequency"), format="%.2f"),
             "avg_order_hour_of_day": st.column_config.NumberColumn("Avg Order Hour", format="%.1f"),
             "weekend_order_ratio": st.column_config.ProgressColumn("Weekend Ratio", format="%.2f", min_value=0, max_value=1),
             "evening_order_ratio": st.column_config.ProgressColumn("Evening Ratio", format="%.2f", min_value=0, max_value=1),
@@ -2284,6 +2759,7 @@ def render_decision_engine(kpis: dict[str, Any]) -> None:
             },
             "anomalies": [],
             "use_gemini": use_gemini,
+            "language": get_language(),
         }
         try:
             with st.spinner(translate("run_decision_engine")):
@@ -2295,17 +2771,18 @@ def render_decision_engine(kpis: dict[str, Any]) -> None:
             return
 
     response = st.session_state.get("decision_engine_response") or {}
-    decisions = response.get("decisions") or []
+    decisions = [translate_decision_record(decision) for decision in response.get("decisions") or []]
     alerts = [decision for decision in decisions if decision.get("decision_type") == "alert"]
     recommendations = [decision for decision in decisions if decision.get("decision_type") == "recommendation"]
-    anomalies = response.get("anomalies") or []
+    anomalies = [translate_decision_record(anomaly) for anomaly in response.get("anomalies") or []]
+    explanation_source = translate_decision_output_text(response.get("explanation_source", "local_fallback"))
 
     st.divider()
     summary_columns = st.columns(4)
     summary_columns[0].metric(translate("detected_anomalies"), format_number(len(anomalies)))
     summary_columns[1].metric(translate("priority_alerts"), format_number(len(alerts)))
     summary_columns[2].metric(translate("decision_recommendations"), format_number(len(recommendations)))
-    summary_columns[3].metric(translate("explanation_source"), str(response.get("explanation_source", "local_fallback")))
+    summary_columns[3].metric(translate("explanation_source"), explanation_source)
 
     gemini_requested = bool(response.get("gemini_requested"))
     gemini_configured = bool(response.get("gemini_configured"))
@@ -2320,13 +2797,13 @@ def render_decision_engine(kpis: dict[str, Any]) -> None:
                     translate("gemini_configured"): translate("gemini_yes")
                     if gemini_configured
                     else translate("gemini_no"),
-                    translate("explanation_source"): response.get("explanation_source", "local_fallback"),
+                    translate("explanation_source"): explanation_source,
                 }
             ]
         )
         st.dataframe(status_frame, use_container_width=True, hide_index=True)
         if explanation_detail:
-            st.caption(str(explanation_detail))
+            st.caption(translate_decision_output_text(explanation_detail))
         if gemini_requested and not gemini_configured:
             st.warning(translate("gemini_not_configured_help"))
 
