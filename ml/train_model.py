@@ -5,7 +5,9 @@ from pathlib import Path
 
 import joblib
 import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.base import ClassifierMixin
+from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     accuracy_score,
     average_precision_score,
@@ -21,6 +23,8 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 
 from config.logging_config import configure_logging
 from config.settings import get_settings
@@ -34,6 +38,7 @@ DEFAULT_METRICS_PATH = Path("ml/artifacts/training_metrics.json")
 DEFAULT_FEATURE_IMPORTANCE_PATH = Path("ml/artifacts/feature_importance.csv")
 DEFAULT_SOURCE_RELATION = "fct_orders"
 MAX_CURVE_POINTS = 200
+MODEL_SELECTION_METRIC = "roc_auc"
 
 
 def load_feature_store(table_name: str) -> pd.DataFrame:
@@ -170,6 +175,145 @@ def sample_curve_rows(rows: list[dict[str, float | None]], max_points: int = MAX
     return [row for index, row in enumerate(rows) if index in indexes]
 
 
+def get_candidate_models(random_state: int = 42) -> dict[str, ClassifierMixin]:
+    return {
+        "random_forest": RandomForestClassifier(
+            n_estimators=80,
+            max_depth=12,
+            min_samples_leaf=2,
+            random_state=random_state,
+            n_jobs=-1,
+            class_weight="balanced",
+        ),
+        "logistic_regression": Pipeline(
+            steps=[
+                ("scaler", StandardScaler()),
+                (
+                    "classifier",
+                    LogisticRegression(
+                        max_iter=1_000,
+                        class_weight="balanced",
+                        random_state=random_state,
+                    ),
+                ),
+            ]
+        ),
+        "gradient_boosting": GradientBoostingClassifier(
+            n_estimators=120,
+            learning_rate=0.05,
+            max_depth=3,
+            random_state=random_state,
+        ),
+    }
+
+
+def get_probability_scores(model: ClassifierMixin, features: pd.DataFrame) -> list[float]:
+    if hasattr(model, "predict_proba"):
+        return model.predict_proba(features)[:, 1].tolist()
+
+    if hasattr(model, "decision_function"):
+        scores = model.decision_function(features)
+        minimum = min(scores)
+        maximum = max(scores)
+        if maximum == minimum:
+            return [0.5 for _ in scores]
+        return [float((score - minimum) / (maximum - minimum)) for score in scores]
+
+    return [float(prediction) for prediction in model.predict(features)]
+
+
+def evaluate_model(
+    model_name: str,
+    model: ClassifierMixin,
+    x_test: pd.DataFrame,
+    y_test: pd.Series,
+    target: pd.Series,
+) -> dict[str, object]:
+    predictions = model.predict(x_test)
+    probabilities = get_probability_scores(model, x_test)
+    matrix = confusion_matrix(y_test, predictions)
+    threshold_analysis = build_threshold_analysis(y_test, probabilities)
+    roc_rows, precision_recall_rows = build_curve_rows(y_test, probabilities)
+
+    return {
+        "model_name": model_name,
+        "accuracy": float(accuracy_score(y_test, predictions)),
+        "balanced_accuracy": float(balanced_accuracy_score(y_test, predictions)),
+        "precision": float(precision_score(y_test, predictions, zero_division=0)),
+        "recall": float(recall_score(y_test, predictions, zero_division=0)),
+        "f1": float(f1_score(y_test, predictions, zero_division=0)),
+        "roc_auc": float(roc_auc_score(y_test, probabilities)) if y_test.nunique() == 2 else None,
+        "average_precision": (
+            float(average_precision_score(y_test, probabilities)) if y_test.nunique() == 2 else None
+        ),
+        "brier_score": float(brier_score_loss(y_test, probabilities)),
+        "train_rows": int(len(target) - len(y_test)),
+        "test_rows": int(len(y_test)),
+        "positive_rate": float(target.mean()),
+        "confusion_matrix": matrix.tolist(),
+        "classification_report": classification_report(
+            y_test,
+            predictions,
+            output_dict=True,
+            zero_division=0,
+        ),
+        "threshold_analysis": threshold_analysis,
+        "recommended_threshold": max(threshold_analysis, key=lambda row: row["f1"])["threshold"],
+        "roc_curve": sample_curve_rows(roc_rows),
+        "precision_recall_curve": sample_curve_rows(precision_recall_rows),
+    }
+
+
+def build_model_comparison(results: dict[str, dict[str, object]]) -> list[dict[str, object]]:
+    rows = []
+    for model_name, metrics in results.items():
+        rows.append(
+            {
+                "model_name": model_name,
+                "accuracy": metrics.get("accuracy"),
+                "balanced_accuracy": metrics.get("balanced_accuracy"),
+                "precision": metrics.get("precision"),
+                "recall": metrics.get("recall"),
+                "f1": metrics.get("f1"),
+                "roc_auc": metrics.get("roc_auc"),
+                "average_precision": metrics.get("average_precision"),
+                "brier_score": metrics.get("brier_score"),
+            }
+        )
+
+    return sorted(
+        rows,
+        key=lambda row: (
+            row.get(MODEL_SELECTION_METRIC) is not None,
+            float(row.get(MODEL_SELECTION_METRIC) or 0),
+            float(row.get("f1") or 0),
+        ),
+        reverse=True,
+    )
+
+
+def extract_feature_importance(model: ClassifierMixin, feature_names: pd.Index) -> pd.DataFrame:
+    estimator = model
+    if isinstance(model, Pipeline):
+        estimator = model.named_steps["classifier"]
+
+    if hasattr(estimator, "feature_importances_"):
+        values = estimator.feature_importances_
+    elif hasattr(estimator, "coef_"):
+        values = abs(estimator.coef_[0])
+    else:
+        values = [0 for _ in feature_names]
+
+    total = sum(values)
+    normalized_values = values if total == 0 else [float(value / total) for value in values]
+    return pd.DataFrame(
+        {
+            "feature": feature_names,
+            "importance": normalized_values,
+        }
+    ).sort_values("importance", ascending=False)
+
+
 def build_model_recommendations(
     metrics: dict[str, object],
     feature_importance: pd.DataFrame,
@@ -232,7 +376,7 @@ def train_random_forest(
     target: pd.Series,
     test_size: float = 0.2,
     random_state: int = 42,
-) -> tuple[RandomForestClassifier, dict[str, object], pd.DataFrame]:
+) -> tuple[ClassifierMixin, dict[str, object], pd.DataFrame]:
     stratify = target if target.value_counts().min() >= 2 else None
     x_train, x_test, y_train, y_test = train_test_split(
         features,
@@ -242,61 +386,29 @@ def train_random_forest(
         stratify=stratify,
     )
 
-    model = RandomForestClassifier(
-        n_estimators=80,
-        max_depth=12,
-        min_samples_leaf=2,
-        random_state=random_state,
-        n_jobs=-1,
-        class_weight="balanced",
-    )
-    model.fit(x_train, y_train)
+    trained_models = {}
+    model_results = {}
+    for model_name, candidate_model in get_candidate_models(random_state).items():
+        logger.info("Training candidate model: %s", model_name)
+        candidate_model.fit(x_train, y_train)
+        trained_models[model_name] = candidate_model
+        model_results[model_name] = evaluate_model(model_name, candidate_model, x_test, y_test, target)
 
-    predictions = model.predict(x_test)
-    probabilities = model.predict_proba(x_test)[:, 1]
-    matrix = confusion_matrix(y_test, predictions)
-    threshold_analysis = build_threshold_analysis(y_test, probabilities)
-    roc_rows, precision_recall_rows = build_curve_rows(y_test, probabilities)
+    comparison = build_model_comparison(model_results)
+    best_model_name = str(comparison[0]["model_name"])
+    model = trained_models[best_model_name]
+    metrics = model_results[best_model_name]
+    metrics["selected_model"] = best_model_name
+    metrics["model_selection_metric"] = MODEL_SELECTION_METRIC
+    metrics["model_comparison"] = comparison
 
-    metrics = {
-        "accuracy": float(accuracy_score(y_test, predictions)),
-        "balanced_accuracy": float(balanced_accuracy_score(y_test, predictions)),
-        "precision": float(precision_score(y_test, predictions, zero_division=0)),
-        "recall": float(recall_score(y_test, predictions, zero_division=0)),
-        "f1": float(f1_score(y_test, predictions, zero_division=0)),
-        "roc_auc": float(roc_auc_score(y_test, probabilities)) if y_test.nunique() == 2 else None,
-        "average_precision": (
-            float(average_precision_score(y_test, probabilities)) if y_test.nunique() == 2 else None
-        ),
-        "brier_score": float(brier_score_loss(y_test, probabilities)),
-        "train_rows": len(x_train),
-        "test_rows": len(x_test),
-        "positive_rate": float(target.mean()),
-        "confusion_matrix": matrix.tolist(),
-        "classification_report": classification_report(
-            y_test,
-            predictions,
-            output_dict=True,
-            zero_division=0,
-        ),
-        "threshold_analysis": threshold_analysis,
-        "recommended_threshold": max(threshold_analysis, key=lambda row: row["f1"])["threshold"],
-        "roc_curve": sample_curve_rows(roc_rows),
-        "precision_recall_curve": sample_curve_rows(precision_recall_rows),
-    }
-
-    feature_importance = pd.DataFrame(
-        {
-            "feature": features.columns,
-            "importance": model.feature_importances_,
-        }
-    ).sort_values("importance", ascending=False)
+    feature_importance = extract_feature_importance(model, features.columns)
     metrics["model_recommendations"] = build_model_recommendations(metrics, feature_importance)
 
     return model, metrics, feature_importance
 
 
-def save_model(model: RandomForestClassifier, model_path: Path = DEFAULT_MODEL_PATH) -> None:
+def save_model(model: ClassifierMixin, model_path: Path = DEFAULT_MODEL_PATH) -> None:
     model_path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(model, model_path)
     logger.info("Saved trained model to %s", model_path)

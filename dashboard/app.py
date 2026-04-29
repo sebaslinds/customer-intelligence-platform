@@ -150,7 +150,7 @@ TRANSLATIONS = {
         "model_card_target": "Target",
         "model_card_target_value": "will_reorder: whether a future order contains at least one reordered item",
         "model_card_model": "Model",
-        "model_card_model_value": "RandomForestClassifier with balanced class weights",
+        "model_card_model_value": "Best model selected from RandomForest, LogisticRegression, and GradientBoosting",
         "model_card_use_case": "Business use case",
         "model_card_use_case_value": "Support retention campaigns, reorder nudges, and customer prioritization.",
         "model_card_features": "Main features",
@@ -163,6 +163,12 @@ TRANSLATIONS = {
         "model_card_monitoring": "Monitoring guidance",
         "model_card_monitoring_value": (
             "Track recall, precision, balanced accuracy, positive rate, and threshold behavior after each retrain."
+        ),
+        "selected_model": "Selected Model",
+        "model_comparison": "Model Comparison",
+        "model_comparison_help": (
+            "Models are compared on the same train/test split. ROC AUC is used for selection, then F1, "
+            "precision, recall, and calibration are reviewed for business tradeoffs."
         ),
         "ai_copilot": "AI Copilot",
         "ai_business_copilot": "AI Business Copilot",
@@ -347,7 +353,7 @@ TRANSLATIONS = {
         "model_card_target": "Target",
         "model_card_target_value": "will_reorder: indique si une future commande contient au moins un produit recommande",
         "model_card_model": "Modele",
-        "model_card_model_value": "RandomForestClassifier avec poids de classes equilibres",
+        "model_card_model_value": "Meilleur modele choisi entre RandomForest, LogisticRegression et GradientBoosting",
         "model_card_use_case": "Usage business",
         "model_card_use_case_value": "Aider les campagnes de retention, les nudges de recommande et la priorisation client.",
         "model_card_features": "Features principales",
@@ -360,6 +366,12 @@ TRANSLATIONS = {
         "model_card_monitoring": "Suivi recommande",
         "model_card_monitoring_value": (
             "Surveiller recall, precision, accuracy equilibree, taux positif et comportement des seuils apres chaque retraining."
+        ),
+        "selected_model": "Modele selectionne",
+        "model_comparison": "Comparaison des modeles",
+        "model_comparison_help": (
+            "Les modeles sont compares sur le meme split train/test. ROC AUC sert a choisir le modele, puis F1, "
+            "precision, recall et calibration sont analyses pour les compromis business."
         ),
         "ai_copilot": "Copilot IA",
         "ai_business_copilot": "Copilot Business IA",
@@ -1449,7 +1461,77 @@ def render_model_summary_cards(metrics: dict[str, Any], feature_importance: pd.D
         col_a, col_b, col_c = st.columns(3)
         col_a.metric(translate("positive_rate"), format_percent(metrics.get("positive_rate", 0)))
         col_b.metric(translate("recommended_threshold"), f"{float(metrics.get('recommended_threshold') or 0.5):.2f}")
-        col_c.metric("Top Driver", top_feature)
+        col_c.metric(translate("selected_model"), str(metrics.get("selected_model") or "random_forest"))
+        st.caption(f"Top Driver: {top_feature}")
+
+
+def build_model_comparison_frame(metrics: dict[str, Any]) -> pd.DataFrame:
+    comparison = metrics.get("model_comparison") or []
+    if not comparison:
+        return pd.DataFrame()
+
+    frame = pd.DataFrame(comparison)
+    metric_columns = [
+        "accuracy",
+        "balanced_accuracy",
+        "precision",
+        "recall",
+        "f1",
+        "roc_auc",
+        "average_precision",
+        "brier_score",
+    ]
+    for column in metric_columns:
+        if column in frame.columns:
+            frame[column] = pd.to_numeric(frame[column], errors="coerce")
+    return frame
+
+
+def render_model_comparison(metrics: dict[str, Any]) -> None:
+    comparison_frame = build_model_comparison_frame(metrics)
+    if comparison_frame.empty:
+        return
+
+    st.subheader(translate("model_comparison"))
+    st.caption(translate("model_comparison_help"))
+    chart_frame = comparison_frame[["model_name", "roc_auc", "f1", "balanced_accuracy"]].melt(
+        id_vars="model_name",
+        var_name="metric",
+        value_name="score",
+    )
+    chart = (
+        alt.Chart(chart_frame)
+        .mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3)
+        .encode(
+            x=alt.X("model_name:N", axis=alt.Axis(title=None, labelAngle=-15), sort=None),
+            y=alt.Y("score:Q", axis=alt.Axis(title="Score"), scale=alt.Scale(domain=[0, 1])),
+            color=alt.Color("metric:N", title="Metric"),
+            xOffset="metric:N",
+            tooltip=[
+                alt.Tooltip("model_name:N", title="Model"),
+                alt.Tooltip("metric:N", title="Metric"),
+                alt.Tooltip("score:Q", title="Score", format=".3f"),
+            ],
+        )
+        .properties(height=360)
+    )
+    st.altair_chart(chart, use_container_width=True)
+    st.dataframe(
+        comparison_frame,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "model_name": "Model",
+            "accuracy": st.column_config.ProgressColumn("Accuracy", format="%.3f", min_value=0, max_value=1),
+            "balanced_accuracy": st.column_config.ProgressColumn("Balanced Accuracy", format="%.3f", min_value=0, max_value=1),
+            "precision": st.column_config.ProgressColumn("Precision", format="%.3f", min_value=0, max_value=1),
+            "recall": st.column_config.ProgressColumn("Recall", format="%.3f", min_value=0, max_value=1),
+            "f1": st.column_config.ProgressColumn("F1", format="%.3f", min_value=0, max_value=1),
+            "roc_auc": st.column_config.ProgressColumn("ROC AUC", format="%.3f", min_value=0, max_value=1),
+            "average_precision": st.column_config.ProgressColumn("Avg Precision", format="%.3f", min_value=0, max_value=1),
+            "brier_score": st.column_config.NumberColumn("Brier", format="%.3f"),
+        },
+    )
 
 
 def render_model_card() -> None:
@@ -1481,6 +1563,7 @@ def render_model_performance(metrics: dict[str, Any], feature_importance: pd.Dat
 
     render_model_card()
     render_model_summary_cards(metrics, feature_importance)
+    render_model_comparison(metrics)
 
     accuracy, balanced_accuracy, precision, recall, f1_score, roc_auc = st.columns(6)
     accuracy.metric(translate("accuracy"), format_percent(metrics.get("accuracy", 0)))
