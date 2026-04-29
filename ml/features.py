@@ -17,6 +17,13 @@ FEATURE_COLUMNS = [
     "weekend_order_ratio",
     "evening_order_ratio",
     "prior_reorder_order_ratio",
+    "unique_products",
+    "unique_departments",
+    "unique_aisles",
+    "produce_item_ratio",
+    "dairy_eggs_item_ratio",
+    "fresh_fruits_item_ratio",
+    "fresh_vegetables_item_ratio",
 ]
 
 TARGET_COLUMN = "will_reorder"
@@ -182,37 +189,92 @@ def build_reorder_training_query(source_relation: str = "fct_orders", row_limit:
                     else 0
                 end as will_reorder
             from order_timeline
+        ),
+
+        product_events as (
+            select
+                order_timeline.user_id,
+                order_timeline.order_id,
+                order_timeline.order_number,
+                stg_order_products.product_id,
+                lower(coalesce(dim_products.department, 'unknown')) as department,
+                lower(coalesce(dim_products.aisle, 'unknown')) as aisle
+            from order_timeline
+            inner join stg_order_products
+                on order_timeline.order_id = stg_order_products.order_id
+            inner join dim_products
+                on stg_order_products.product_id = dim_products.product_id
+        ),
+
+        product_history as (
+            select
+                ordered_history.user_id,
+                ordered_history.order_id,
+                count(distinct product_events.product_id) as unique_products,
+                count(distinct product_events.department) as unique_departments,
+                count(distinct product_events.aisle) as unique_aisles,
+                coalesce(
+                    count_if(product_events.department = 'produce') / nullif(count(product_events.order_id), 0),
+                    0
+                ) as produce_item_ratio,
+                coalesce(
+                    count_if(product_events.department = 'dairy eggs') / nullif(count(product_events.order_id), 0),
+                    0
+                ) as dairy_eggs_item_ratio,
+                coalesce(
+                    count_if(product_events.aisle = 'fresh fruits') / nullif(count(product_events.order_id), 0),
+                    0
+                ) as fresh_fruits_item_ratio,
+                coalesce(
+                    count_if(product_events.aisle = 'fresh vegetables') / nullif(count(product_events.order_id), 0),
+                    0
+                ) as fresh_vegetables_item_ratio
+            from ordered_history
+            left join product_events
+                on ordered_history.user_id = product_events.user_id
+                and product_events.order_number < ordered_history.order_number
+            group by ordered_history.user_id, ordered_history.order_id
         )
 
         select
-            user_id,
-            order_id,
-            order_number,
-            total_orders,
-            observed_basket_orders,
-            avg_basket_size,
-            reorder_ratio,
-            coalesce(prior_reorder_order_ratio, 0) as prior_reorder_order_ratio,
-            days_between_orders,
-            stddev_days_between_orders,
-            days_since_last_order,
-            customer_tenure_days,
-            order_frequency_30d,
-            avg_order_dow,
-            avg_order_hour_of_day,
-            weekend_order_ratio,
-            evening_order_ratio,
-            will_reorder
+            ordered_history.user_id,
+            ordered_history.order_id,
+            ordered_history.order_number,
+            ordered_history.total_orders,
+            ordered_history.observed_basket_orders,
+            ordered_history.avg_basket_size,
+            ordered_history.reorder_ratio,
+            coalesce(ordered_history.prior_reorder_order_ratio, 0) as prior_reorder_order_ratio,
+            ordered_history.days_between_orders,
+            ordered_history.stddev_days_between_orders,
+            ordered_history.days_since_last_order,
+            ordered_history.customer_tenure_days,
+            ordered_history.order_frequency_30d,
+            ordered_history.avg_order_dow,
+            ordered_history.avg_order_hour_of_day,
+            ordered_history.weekend_order_ratio,
+            ordered_history.evening_order_ratio,
+            coalesce(product_history.unique_products, 0) as unique_products,
+            coalesce(product_history.unique_departments, 0) as unique_departments,
+            coalesce(product_history.unique_aisles, 0) as unique_aisles,
+            coalesce(product_history.produce_item_ratio, 0) as produce_item_ratio,
+            coalesce(product_history.dairy_eggs_item_ratio, 0) as dairy_eggs_item_ratio,
+            coalesce(product_history.fresh_fruits_item_ratio, 0) as fresh_fruits_item_ratio,
+            coalesce(product_history.fresh_vegetables_item_ratio, 0) as fresh_vegetables_item_ratio,
+            ordered_history.will_reorder
         from ordered_history
-        where total_orders >= 1
-            and will_reorder is not null
-            and order_id in (
+        left join product_history
+            on ordered_history.user_id = product_history.user_id
+            and ordered_history.order_id = product_history.order_id
+        where ordered_history.total_orders >= 1
+            and ordered_history.will_reorder is not null
+            and ordered_history.order_id in (
                 select order_id
                 from {source_relation}
                 where eval_set = 'train'
                     and item_count > 0
             )
-        order by user_id, order_number
+        order by ordered_history.user_id, ordered_history.order_number
         {limit_clause}
         """
     ).strip()
