@@ -116,6 +116,10 @@ TRANSLATIONS = {
             "that a customer placed orders, but not enough about the exact products inside those baskets."
         ),
         "segment_description": "How to read it",
+        "segment_guide": "Segment Guide",
+        "customer_segment_snapshot": "Segment Snapshot",
+        "sample_customer_profiles": "Representative Customer Profiles",
+        "customer_id": "Customer ID",
         "limited_basket_detail_description": (
             "Many orders do not have enough product-level basket data. Treat product and reorder-product conclusions cautiously."
         ),
@@ -418,6 +422,10 @@ TRANSLATIONS = {
             "faible, on sait qu'un client a passe des commandes, mais on connait mal le contenu exact de ses paniers."
         ),
         "segment_description": "Comment l'interpreter",
+        "segment_guide": "Guide des segments",
+        "customer_segment_snapshot": "Synthese par segment",
+        "sample_customer_profiles": "Profils clients representatifs",
+        "customer_id": "Client ID",
         "limited_basket_detail_description": (
             "Beaucoup de commandes n'ont pas assez de donnees produit rattachees au panier. Les conclusions "
             "sur les produits et les rachats produit doivent rester prudentes."
@@ -1665,6 +1673,57 @@ def render_customer_summary_cards(summary: dict[str, Any]) -> None:
     reorder_ratio.metric(translate("avg_reorder_ratio"), format_percent(summary.get("avg_reorder_ratio", 0)))
 
 
+def get_row_value(row: pd.Series, column_name: str, default: Any = 0) -> Any:
+    value = row.get(column_name, default)
+    if pd.isna(value):
+        return default
+    return value
+
+
+def render_segment_guide_cards() -> None:
+    segment_rows = [
+        ("limited_basket_detail", "limited_basket_detail_description"),
+        ("loyal_reorder", "loyal_reorder_description"),
+        ("at_risk_customer", "at_risk_customer_description"),
+        ("product_explorer", "product_explorer_description"),
+        ("steady_customer", "steady_customer_description"),
+    ]
+
+    st.markdown(f"**{translate('segment_guide')}**")
+    for row_start in range(0, len(segment_rows), 2):
+        row_segments = segment_rows[row_start : row_start + 2]
+        columns = st.columns(len(row_segments))
+        for column, (segment_key, description_key) in zip(columns, row_segments, strict=False):
+            with column.container(border=True):
+                st.markdown(f"**{translate(segment_key)}**")
+                st.caption(translate(description_key))
+
+
+def render_segment_metric_cards(segment_frame: pd.DataFrame) -> None:
+    if segment_frame.empty:
+        return
+
+    st.markdown(f"**{translate('customer_segment_snapshot')}**")
+    display_frame = segment_frame.sort_values("users", ascending=False)
+    for row_start in range(0, len(display_frame), 2):
+        row_segments = display_frame.iloc[row_start : row_start + 2]
+        columns = st.columns(len(row_segments))
+        for column, (_, row) in zip(columns, row_segments.iterrows(), strict=False):
+            with column.container(border=True):
+                st.markdown(f"**{get_row_value(row, 'customer_segment_label', '')}**")
+                metric_columns = st.columns(4)
+                metric_columns[0].metric(translate("users"), format_number(get_row_value(row, "users")))
+                metric_columns[1].metric(translate("avg_orders"), format_number(get_row_value(row, "avg_total_orders")))
+                metric_columns[2].metric(
+                    translate("avg_reorder_ratio"),
+                    format_percent(get_row_value(row, "avg_reorder_ratio")),
+                )
+                metric_columns[3].metric(
+                    translate("avg_observed_coverage"),
+                    format_percent(get_row_value(row, "avg_observed_basket_coverage")),
+                )
+
+
 def render_customer_segment_summary(segment_summary: pd.DataFrame) -> None:
     if segment_summary.empty:
         return
@@ -1676,32 +1735,7 @@ def render_customer_segment_summary(segment_summary: pd.DataFrame) -> None:
     st.markdown(f"**{translate('customer_segment_summary')}**")
     st.caption(translate("customer_segment_summary_caption"))
     st.info(f"{translate('behavior_segments_definition')} {translate('basket_detail_definition')}")
-
-    segment_guide = pd.DataFrame(
-        [
-            {
-                translate("customer_segment"): translate("limited_basket_detail"),
-                translate("segment_description"): translate("limited_basket_detail_description"),
-            },
-            {
-                translate("customer_segment"): translate("loyal_reorder"),
-                translate("segment_description"): translate("loyal_reorder_description"),
-            },
-            {
-                translate("customer_segment"): translate("at_risk_customer"),
-                translate("segment_description"): translate("at_risk_customer_description"),
-            },
-            {
-                translate("customer_segment"): translate("product_explorer"),
-                translate("segment_description"): translate("product_explorer_description"),
-            },
-            {
-                translate("customer_segment"): translate("steady_customer"),
-                translate("segment_description"): translate("steady_customer_description"),
-            },
-        ]
-    )
-    st.dataframe(segment_guide, use_container_width=True, hide_index=True)
+    render_segment_guide_cards()
 
     chart_column, table_column = st.columns([1.1, 1])
     with chart_column:
@@ -1731,37 +1765,7 @@ def render_customer_segment_summary(segment_summary: pd.DataFrame) -> None:
         )
         st.altair_chart(chart, use_container_width=True)
     with table_column:
-        display_frame = segment_frame.sort_values("users", ascending=False)
-        st.dataframe(
-            display_frame[
-                [
-                    "customer_segment_label",
-                    "users",
-                    "avg_total_orders",
-                    "avg_reorder_ratio",
-                    "avg_observed_basket_coverage",
-                ]
-            ],
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "customer_segment_label": translate("customer_segment"),
-                "users": st.column_config.NumberColumn(translate("users"), format="%d"),
-                "avg_total_orders": st.column_config.NumberColumn(translate("avg_orders"), format="%.1f"),
-                "avg_reorder_ratio": st.column_config.ProgressColumn(
-                    translate("avg_reorder_ratio"),
-                    format="%.2f",
-                    min_value=0,
-                    max_value=1,
-                ),
-                "avg_observed_basket_coverage": st.column_config.ProgressColumn(
-                    translate("observed_basket_coverage"),
-                    format="%.2f",
-                    min_value=0,
-                    max_value=1,
-                ),
-            },
-        )
+        render_segment_metric_cards(segment_frame)
 
 
 def render_customer_behavior_charts(frame: pd.DataFrame) -> None:
@@ -1834,6 +1838,37 @@ def render_customer_behavior_charts(frame: pd.DataFrame) -> None:
         st.altair_chart(scatter, use_container_width=True)
 
 
+def render_representative_customer_cards(frame: pd.DataFrame) -> None:
+    if frame.empty:
+        return
+
+    st.markdown(f"**{translate('sample_customer_profiles')}**")
+    display_frame = frame.sort_values(["customer_segment_label", "total_orders"], ascending=[True, False]).head(12)
+    for row_start in range(0, len(display_frame), 3):
+        row_customers = display_frame.iloc[row_start : row_start + 3]
+        columns = st.columns(len(row_customers))
+        for column, (_, row) in zip(columns, row_customers.iterrows(), strict=False):
+            with column.container(border=True):
+                st.caption(get_row_value(row, "customer_segment_label", ""))
+                st.markdown(f"**{translate('customer_id')} {get_row_value(row, 'user_id', '')}**")
+                metric_columns = st.columns(2)
+                metric_columns[0].metric(translate("orders"), format_number(get_row_value(row, "total_orders")))
+                metric_columns[1].metric(
+                    translate("avg_reorder_ratio"),
+                    format_percent(get_row_value(row, "reorder_ratio")),
+                )
+                st.caption(
+                    " | ".join(
+                        [
+                            f"{translate('unique_products')}: {format_number(get_row_value(row, 'unique_products'))}",
+                            f"{translate('days_between_orders')}: {format_number(get_row_value(row, 'days_between_orders'))}",
+                            f"{translate('avg_observed_coverage')}: "
+                            f"{format_percent(get_row_value(row, 'observed_basket_coverage'))}",
+                        ]
+                    )
+                )
+
+
 def render_customer_insights(frame: pd.DataFrame) -> None:
     st.subheader(translate("customer_insights"))
     if frame.empty:
@@ -1862,55 +1897,7 @@ def render_customer_insights(frame: pd.DataFrame) -> None:
 
     table_frame = frame.copy()
     table_frame["customer_segment_label"] = table_frame["customer_segment"].map(translate_customer_segment)
-    display_columns = [
-        "user_id",
-        "customer_segment_label",
-        "total_orders",
-        "observed_basket_orders",
-        "observed_basket_coverage",
-        "avg_basket_size",
-        "reorder_ratio",
-        "reorder_order_ratio",
-        "unique_products",
-        "days_between_orders",
-        "order_frequency_30d",
-    ]
-    display_columns = [column_name for column_name in display_columns if column_name in table_frame.columns]
-    st.markdown(f"**{translate('representative_customers')}**")
-    st.dataframe(
-        table_frame[display_columns],
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "user_id": "User ID",
-            "customer_segment_label": translate("customer_segment"),
-            "total_orders": st.column_config.NumberColumn(translate("orders"), format="%d"),
-            "observed_basket_orders": st.column_config.NumberColumn(translate("observed_baskets"), format="%d"),
-            "observed_basket_coverage": st.column_config.ProgressColumn(
-                translate("observed_basket_coverage"),
-                format="%.2f",
-                min_value=0,
-                max_value=1,
-            ),
-            "avg_basket_size": st.column_config.NumberColumn(translate("avg_basket_size"), format="%.2f"),
-            "stddev_basket_size": st.column_config.NumberColumn("Basket Variability", format="%.2f"),
-            "reorder_ratio": st.column_config.ProgressColumn("Reorder Ratio", format="%.2f", min_value=0, max_value=1),
-            "reorder_order_ratio": st.column_config.ProgressColumn(
-                translate("reorder_order_ratio"),
-                format="%.2f",
-                min_value=0,
-                max_value=1,
-            ),
-            "unique_products": st.column_config.NumberColumn(translate("unique_products"), format="%d"),
-            "days_between_orders": st.column_config.NumberColumn(translate("days_between_orders"), format="%.2f"),
-            "stddev_days_between_orders": st.column_config.NumberColumn("Gap Variability", format="%.2f"),
-            "customer_tenure_days": st.column_config.NumberColumn("Tenure Days", format="%.0f"),
-            "order_frequency_30d": st.column_config.NumberColumn(translate("monthly_frequency"), format="%.2f"),
-            "avg_order_hour_of_day": st.column_config.NumberColumn("Avg Order Hour", format="%.1f"),
-            "weekend_order_ratio": st.column_config.ProgressColumn("Weekend Ratio", format="%.2f", min_value=0, max_value=1),
-            "evening_order_ratio": st.column_config.ProgressColumn("Evening Ratio", format="%.2f", min_value=0, max_value=1),
-        },
-    )
+    render_representative_customer_cards(table_frame)
 
 
 def render_product_trends(frame: pd.DataFrame) -> None:
