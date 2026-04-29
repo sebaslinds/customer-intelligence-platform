@@ -97,7 +97,7 @@ TRANSLATIONS = {
         "reorder_order_ratio": "Reorder Order Ratio",
         "days_between_orders": "Days Between Orders",
         "order_cap_share": "At 100-Order Cap",
-        "avg_observed_coverage": "Basket Coverage",
+        "avg_observed_coverage": "Documented Baskets",
         "avg_reorder_ratio": "Avg Reorder Ratio",
         "unique_products": "Unique Products",
         "monthly_frequency": "Monthly Frequency",
@@ -105,6 +105,31 @@ TRANSLATIONS = {
         "customer_segment_summary_caption": (
             "Segments combine reorder behavior, purchase interval, product breadth, and data coverage. "
             "They are more useful than a simple top-user ranking."
+        ),
+        "behavior_segments_definition": (
+            "Behavioral segments group customers by how they buy, not only by how many orders they have. "
+            "They combine reorder intensity, purchase gaps, product variety, and basket item data coverage to "
+            "turn raw customer rows into business actions."
+        ),
+        "basket_detail_definition": (
+            "Basket item data means the products attached to each order. When coverage is low, we may know "
+            "that a customer placed orders, but not enough about the exact products inside those baskets."
+        ),
+        "segment_description": "How to read it",
+        "limited_basket_detail_description": (
+            "Many orders do not have enough product-level basket data. Treat product and reorder-product conclusions cautiously."
+        ),
+        "loyal_reorder_description": (
+            "Customer shows strong repeat-purchase behavior. Useful for loyalty, retention, and repeat-product analysis."
+        ),
+        "at_risk_customer_description": (
+            "Customer has weak reorder behavior or long purchase gaps. This group is a priority for retention actions."
+        ),
+        "product_explorer_description": (
+            "Customer buys across a wider product set. Good candidate for discovery offers and personalized recommendations."
+        ),
+        "steady_customer_description": (
+            "Customer has regular behavior without a strong risk or loyalty signal. Monitor for movement into other segments."
         ),
         "customer_distribution": "Order Distribution",
         "customer_behavior_map": "Customer Behavior Map",
@@ -115,8 +140,8 @@ TRANSLATIONS = {
         "representative_customers": "Representative Customers",
         "customer_segment": "Customer Segment",
         "users": "Users",
-        "observed_basket_coverage": "Observed Basket Coverage",
-        "limited_basket_detail": "Limited basket detail",
+        "observed_basket_coverage": "Documented Basket Coverage",
+        "limited_basket_detail": "Low basket item coverage",
         "loyal_reorder": "Loyal reorder customers",
         "at_risk_customer": "At-risk customers",
         "product_explorer": "Product explorers",
@@ -373,7 +398,7 @@ TRANSLATIONS = {
         "reorder_order_ratio": "Ratio de commandes avec recommande",
         "days_between_orders": "Jours entre commandes",
         "order_cap_share": "Au plafond de 100",
-        "avg_observed_coverage": "Couverture panier",
+        "avg_observed_coverage": "Paniers documentes",
         "avg_reorder_ratio": "Taux moyen de recommande",
         "unique_products": "Produits uniques",
         "monthly_frequency": "Frequence mensuelle",
@@ -381,6 +406,33 @@ TRANSLATIONS = {
         "customer_segment_summary_caption": (
             "Les segments combinent comportement de recommande, delai entre commandes, diversite produits et "
             "couverture des donnees. C'est plus utile qu'un simple classement des meilleurs utilisateurs."
+        ),
+        "behavior_segments_definition": (
+            "Les segments comportementaux regroupent les clients selon leur facon d'acheter, pas seulement selon "
+            "leur nombre de commandes. Ils combinent intensite de recommande, delai entre commandes, diversite "
+            "produits et couverture des produits dans les paniers pour transformer des lignes client brutes "
+            "en actions business."
+        ),
+        "basket_detail_definition": (
+            "Les donnees de panier designent les produits rattaches a chaque commande. Quand la couverture est "
+            "faible, on sait qu'un client a passe des commandes, mais on connait mal le contenu exact de ses paniers."
+        ),
+        "segment_description": "Comment l'interpreter",
+        "limited_basket_detail_description": (
+            "Beaucoup de commandes n'ont pas assez de donnees produit rattachees au panier. Les conclusions "
+            "sur les produits et les rachats produit doivent rester prudentes."
+        ),
+        "loyal_reorder_description": (
+            "Le client montre un fort comportement de rachat. Utile pour analyser fidelite, retention et produits recurrents."
+        ),
+        "at_risk_customer_description": (
+            "Le client a peu de recommandes ou de longs delais entre commandes. Segment prioritaire pour la retention."
+        ),
+        "product_explorer_description": (
+            "Le client achete une variete plus large de produits. Bon candidat pour les offres de decouverte et recommandations."
+        ),
+        "steady_customer_description": (
+            "Le comportement est regulier, sans signal fort de risque ou de fidelite intense. A surveiller dans le temps."
         ),
         "customer_distribution": "Distribution des commandes",
         "customer_behavior_map": "Carte comportementale client",
@@ -391,8 +443,8 @@ TRANSLATIONS = {
         "representative_customers": "Clients representatifs",
         "customer_segment": "Segment client",
         "users": "Utilisateurs",
-        "observed_basket_coverage": "Couverture panier observee",
-        "limited_basket_detail": "Detail panier limite",
+        "observed_basket_coverage": "Couverture des paniers documentes",
+        "limited_basket_detail": "Paniers peu documentes",
         "loyal_reorder": "Clients fideles en recommande",
         "at_risk_customer": "Clients a risque",
         "product_explorer": "Explorateurs produits",
@@ -1623,6 +1675,34 @@ def render_customer_segment_summary(segment_summary: pd.DataFrame) -> None:
 
     st.markdown(f"**{translate('customer_segment_summary')}**")
     st.caption(translate("customer_segment_summary_caption"))
+    st.info(f"{translate('behavior_segments_definition')} {translate('basket_detail_definition')}")
+
+    segment_guide = pd.DataFrame(
+        [
+            {
+                translate("customer_segment"): translate("limited_basket_detail"),
+                translate("segment_description"): translate("limited_basket_detail_description"),
+            },
+            {
+                translate("customer_segment"): translate("loyal_reorder"),
+                translate("segment_description"): translate("loyal_reorder_description"),
+            },
+            {
+                translate("customer_segment"): translate("at_risk_customer"),
+                translate("segment_description"): translate("at_risk_customer_description"),
+            },
+            {
+                translate("customer_segment"): translate("product_explorer"),
+                translate("segment_description"): translate("product_explorer_description"),
+            },
+            {
+                translate("customer_segment"): translate("steady_customer"),
+                translate("segment_description"): translate("steady_customer_description"),
+            },
+        ]
+    )
+    st.dataframe(segment_guide, use_container_width=True, hide_index=True)
+
     chart_column, table_column = st.columns([1.1, 1])
     with chart_column:
         chart = (
