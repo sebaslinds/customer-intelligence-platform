@@ -39,6 +39,7 @@ DEFAULT_FEATURE_IMPORTANCE_PATH = Path("ml/artifacts/feature_importance.csv")
 DEFAULT_SOURCE_RELATION = "fct_orders"
 MAX_CURVE_POINTS = 200
 MODEL_SELECTION_METRIC = "roc_auc"
+THRESHOLD_SELECTION_METRIC = "balanced_accuracy"
 
 
 def load_feature_store(table_name: str) -> pd.DataFrame:
@@ -120,18 +121,43 @@ def build_training_matrix(
 
 def build_threshold_analysis(target: pd.Series, probabilities: pd.Series | list[float]) -> list[dict[str, float]]:
     rows = []
-    for threshold in [round(value / 10, 1) for value in range(1, 10)]:
+    for threshold in [round(value / 20, 2) for value in range(1, 20)]:
         predictions = [1 if probability >= threshold else 0 for probability in probabilities]
+        true_negative, false_positive, false_negative, true_positive = confusion_matrix(
+            target,
+            predictions,
+            labels=[0, 1],
+        ).ravel()
+        specificity_denominator = true_negative + false_positive
+        specificity = true_negative / specificity_denominator if specificity_denominator else 0
         rows.append(
             {
                 "threshold": threshold,
                 "precision": float(precision_score(target, predictions, zero_division=0)),
                 "recall": float(recall_score(target, predictions, zero_division=0)),
                 "f1": float(f1_score(target, predictions, zero_division=0)),
+                "balanced_accuracy": float(balanced_accuracy_score(target, predictions)),
+                "specificity": float(specificity),
+                "false_positive_rate": float(1 - specificity),
                 "positive_prediction_rate": float(sum(predictions) / len(predictions)),
             }
         )
     return rows
+
+
+def select_recommended_threshold(threshold_analysis: list[dict[str, float]]) -> float:
+    if not threshold_analysis:
+        return 0.5
+
+    selected_row = max(
+        threshold_analysis,
+        key=lambda row: (
+            row[THRESHOLD_SELECTION_METRIC],
+            row["f1"],
+            -abs(row["positive_prediction_rate"] - 0.5),
+        ),
+    )
+    return float(selected_row["threshold"])
 
 
 def build_curve_rows(
@@ -229,10 +255,11 @@ def evaluate_model(
     y_test: pd.Series,
     target: pd.Series,
 ) -> dict[str, object]:
-    predictions = model.predict(x_test)
     probabilities = get_probability_scores(model, x_test)
-    matrix = confusion_matrix(y_test, predictions)
     threshold_analysis = build_threshold_analysis(y_test, probabilities)
+    recommended_threshold = select_recommended_threshold(threshold_analysis)
+    predictions = [1 if probability >= recommended_threshold else 0 for probability in probabilities]
+    matrix = confusion_matrix(y_test, predictions)
     roc_rows, precision_recall_rows = build_curve_rows(y_test, probabilities)
 
     return {
@@ -258,7 +285,9 @@ def evaluate_model(
             zero_division=0,
         ),
         "threshold_analysis": threshold_analysis,
-        "recommended_threshold": max(threshold_analysis, key=lambda row: row["f1"])["threshold"],
+        "recommended_threshold": recommended_threshold,
+        "threshold_selection_metric": THRESHOLD_SELECTION_METRIC,
+        "positive_prediction_rate": float(sum(predictions) / len(predictions)),
         "roc_curve": sample_curve_rows(roc_rows),
         "precision_recall_curve": sample_curve_rows(precision_recall_rows),
     }
@@ -276,6 +305,8 @@ def build_model_comparison(results: dict[str, dict[str, object]]) -> list[dict[s
                 "recall": metrics.get("recall"),
                 "f1": metrics.get("f1"),
                 "roc_auc": metrics.get("roc_auc"),
+                "recommended_threshold": metrics.get("recommended_threshold"),
+                "positive_prediction_rate": metrics.get("positive_prediction_rate"),
                 "average_precision": metrics.get("average_precision"),
                 "brier_score": metrics.get("brier_score"),
             }
@@ -323,6 +354,7 @@ def build_model_recommendations(
     roc_auc = metrics.get("roc_auc")
     recall = float(metrics.get("recall") or 0)
     precision = float(metrics.get("precision") or 0)
+    balanced_accuracy = float(metrics.get("balanced_accuracy") or 0)
 
     if positive_rate >= 0.8:
         recommendations.append(
@@ -331,7 +363,19 @@ def build_model_recommendations(
                 "action": "Monitor class imbalance before using the model for automated targeting.",
                 "expected_impact": (
                     "The dataset contains many reorder-positive examples, so accuracy alone can overstate "
-                    "model quality. Use recall, precision, and threshold analysis together."
+                    "model quality. Use balanced accuracy, ROC AUC, and threshold analysis together."
+                ),
+            }
+        )
+
+    if balanced_accuracy < 0.6:
+        recommendations.append(
+            {
+                "priority": "high",
+                "action": "Treat the current classifier as a ranking signal, not a final automated decision.",
+                "expected_impact": (
+                    "Balanced accuracy is close to random because the no-reorder class is hard to detect. "
+                    "Use the probability score for prioritization until richer negative-class features are added."
                 ),
             }
         )

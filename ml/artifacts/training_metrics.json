@@ -1,10 +1,10 @@
 {
   "model_name": "gradient_boosting",
-  "accuracy": 0.934380001524274,
-  "balanced_accuracy": 0.5007701437532126,
-  "precision": 0.9345505832126249,
-  "recall": 0.9997961014599136,
-  "f1": 0.9660729765939002,
+  "accuracy": 0.46414145263318346,
+  "balanced_accuracy": 0.6286715251421126,
+  "precision": 0.9717661915930002,
+  "recall": 0.4393197944702716,
+  "f1": 0.6050887441024488,
   "roc_auc": 0.6947279661547391,
   "average_precision": 0.9669519119062766,
   "brier_score": 0.05939554907085516,
@@ -13,54 +13,90 @@
   "positive_rate": 0.9344404728334185,
   "confusion_matrix": [
     [
-      3,
-      1717
+      1407,
+      313
     ],
     [
-      5,
-      24517
+      13749,
+      10773
     ]
   ],
   "classification_report": {
     "0": {
-      "precision": 0.375,
-      "recall": 0.0017441860465116279,
-      "f1-score": 0.003472222222222222,
+      "precision": 0.09283452098178939,
+      "recall": 0.8180232558139535,
+      "f1-score": 0.16674567433041004,
       "support": 1720.0
     },
     "1": {
-      "precision": 0.9345505832126249,
-      "recall": 0.9997961014599136,
-      "f1-score": 0.9660729765939002,
+      "precision": 0.9717661915930002,
+      "recall": 0.4393197944702716,
+      "f1-score": 0.6050887441024488,
       "support": 24522.0
     },
-    "accuracy": 0.934380001524274,
+    "accuracy": 0.46414145263318346,
     "macro avg": {
-      "precision": 0.6547752916063124,
-      "recall": 0.5007701437532126,
-      "f1-score": 0.4847725994080612,
+      "precision": 0.5323003562873948,
+      "recall": 0.6286715251421126,
+      "f1-score": 0.38591720921642947,
       "support": 26242.0
     },
     "weighted avg": {
-      "precision": 0.8978755202172085,
-      "recall": 0.934380001524274,
-      "f1-score": 0.9029804799275148,
+      "precision": 0.9141576833447232,
+      "recall": 0.46414145263318346,
+      "f1-score": 0.5763580802807924,
       "support": 26242.0
     }
   },
   "threshold_analysis": [
     {
+      "threshold": 0.05,
+      "precision": 0.9344562152274979,
+      "recall": 1.0,
+      "f1": 0.966117721219762,
+      "balanced_accuracy": 0.5,
+      "specificity": 0.0,
+      "false_positive_rate": 1.0,
+      "positive_prediction_rate": 1.0
+    },
+    {
       "threshold": 0.1,
       "precision": 0.9344562152274979,
       "recall": 1.0,
       "f1": 0.966117721219762,
+      "balanced_accuracy": 0.5,
+      "specificity": 0.0,
+      "false_positive_rate": 1.0,
       "positive_prediction_rate": 1.0
+    },
+    {
+      "threshold": 0.15,
+      "precision": 0.9344537174650356,
+      "recall": 0.9999592202919827,
+      "f1": 0.9660973543722791,
+      "balanced_accuracy": 0.49997961014599135,
+      "specificity": 0.0,
+      "false_positive_rate": 1.0,
+      "positive_prediction_rate": 0.9999618931483881
     },
     {
       "threshold": 0.2,
       "precision": 0.9344537174650356,
       "recall": 0.9999592202919827,
       "f1": 0.9660973543722791,
+      "balanced_accuracy": 0.49997961014599135,
+      "specificity": 0.0,
+      "false_positive_rate": 1.0,
+      "positive_prediction_rate": 0.9999618931483881
+    },
+    {
+      "threshold": 0.25,
+      "precision": 0.9344537174650356,
+      "recall": 0.9999592202919827,
+      "f1": 0.9660973543722791,
+      "balanced_accuracy": 0.49997961014599135,
+      "specificity": 0.0,
+      "false_positive_rate": 1.0,
       "positive_prediction_rate": 0.9999618931483881
     },
     {
@@ -68,6 +104,19 @@
       "precision": 0.9344537174650356,
       "recall": 0.9999592202919827,
       "f1": 0.9660973543722791,
+      "balanced_accuracy": 0.49997961014599135,
+      "specificity": 0.0,
+      "false_positive_rate": 1.0,
+      "positive_prediction_rate": 0.9999618931483881
+    },
+    {
+      "threshold": 0.35,
+      "precision": 0.9344537174650356,
+      "recall": 0.9999592202919827,
+      "f1": 0.9660973543722791,
+      "balanced_accuracy": 0.49997961014599135,
+      "specificity": 0.0,
+      "false_positive_rate": 1.0,
       "positive_prediction_rate": 0.9999618931483881
     },
     {
@@ -75,45 +124,125 @@
       "precision": 0.9344537174650356,
       "recall": 0.9999592202919827,
       "f1": 0.9660973543722791,
+      "balanced_accuracy": 0.49997961014599135,
+      "specificity": 0.0,
+      "false_positive_rate": 1.0,
       "positive_prediction_rate": 0.9999618931483881
+    },
+    {
+      "threshold": 0.45,
+      "precision": 0.9345224483573443,
+      "recall": 0.9999184405839654,
+      "f1": 0.9661150512214342,
+      "balanced_accuracy": 0.5005406156408199,
+      "specificity": 0.0011627906976744186,
+      "false_positive_rate": 0.9988372093023256,
+      "positive_prediction_rate": 0.9998475725935523
     },
     {
       "threshold": 0.5,
       "precision": 0.9345505832126249,
       "recall": 0.9997961014599136,
       "f1": 0.9660729765939002,
+      "balanced_accuracy": 0.5007701437532126,
+      "specificity": 0.0017441860465116279,
+      "false_positive_rate": 0.9982558139534884,
       "positive_prediction_rate": 0.9996951451871047
+    },
+    {
+      "threshold": 0.55,
+      "precision": 0.934548088285747,
+      "recall": 0.9997553217518963,
+      "f1": 0.9660526056546153,
+      "balanced_accuracy": 0.500749753899204,
+      "specificity": 0.0017441860465116279,
+      "false_positive_rate": 0.9982558139534884,
+      "positive_prediction_rate": 0.9996570383354927
     },
     {
       "threshold": 0.6,
       "precision": 0.934583714547118,
       "recall": 0.9997553217518963,
       "f1": 0.9660716396737203,
+      "balanced_accuracy": 0.5010404515736225,
+      "specificity": 0.002325581395348837,
+      "false_positive_rate": 0.9976744186046511,
       "positive_prediction_rate": 0.9996189314838808
+    },
+    {
+      "threshold": 0.65,
+      "precision": 0.9345737379899344,
+      "recall": 0.9995922029198271,
+      "f1": 0.9659901477832512,
+      "balanced_accuracy": 0.5009588921575879,
+      "specificity": 0.002325581395348837,
+      "false_positive_rate": 0.9976744186046511,
+      "positive_prediction_rate": 0.9994665040774331
     },
     {
       "threshold": 0.7,
       "precision": 0.9347088211738682,
       "recall": 0.9994698637957752,
       "f1": 0.9660051632737521,
+      "balanced_accuracy": 0.5020605132932364,
+      "specificity": 0.004651162790697674,
+      "false_positive_rate": 0.9953488372093023,
       "positive_prediction_rate": 0.9991997561161496
+    },
+    {
+      "threshold": 0.75,
+      "precision": 0.9348929511887952,
+      "recall": 0.9989805072995678,
+      "f1": 0.9658748151798916,
+      "balanced_accuracy": 0.5035600210916443,
+      "specificity": 0.00813953488372093,
+      "false_positive_rate": 0.9918604651162791,
+      "positive_prediction_rate": 0.9985138327871351
     },
     {
       "threshold": 0.8,
       "precision": 0.9349245751384381,
       "recall": 0.998328031971291,
       "f1": 0.9655866053996489,
+      "balanced_accuracy": 0.5038151787763432,
+      "specificity": 0.009302325581395349,
+      "false_positive_rate": 0.9906976744186047,
       "positive_prediction_rate": 0.9978279094581206
+    },
+    {
+      "threshold": 0.85,
+      "precision": 0.9372394717363357,
+      "recall": 0.9810782154799772,
+      "f1": 0.9586579267199299,
+      "balanced_accuracy": 0.5222251542516165,
+      "specificity": 0.06337209302325582,
+      "false_positive_rate": 0.9366279069767441,
+      "positive_prediction_rate": 0.9781647740263699
     },
     {
       "threshold": 0.9,
       "precision": 0.9513040999572426,
       "recall": 0.8165728733382269,
       "f1": 0.8788045028636633,
+      "balanced_accuracy": 0.6103213203900437,
+      "specificity": 0.40406976744186046,
+      "false_positive_rate": 0.5959302325581395,
       "positive_prediction_rate": 0.8021111195793004
+    },
+    {
+      "threshold": 0.95,
+      "precision": 0.9717661915930002,
+      "recall": 0.4393197944702716,
+      "f1": 0.6050887441024488,
+      "balanced_accuracy": 0.6286715251421126,
+      "specificity": 0.8180232558139535,
+      "false_positive_rate": 0.18197674418604648,
+      "positive_prediction_rate": 0.42245255696974315
     }
   ],
-  "recommended_threshold": 0.1,
+  "recommended_threshold": 0.95,
+  "threshold_selection_metric": "balanced_accuracy",
+  "positive_prediction_rate": 0.42245255696974315,
   "roc_curve": [
     {
       "false_positive_rate": 0.0,
@@ -2123,23 +2252,27 @@
   "model_comparison": [
     {
       "model_name": "gradient_boosting",
-      "accuracy": 0.934380001524274,
-      "balanced_accuracy": 0.5007701437532126,
-      "precision": 0.9345505832126249,
-      "recall": 0.9997961014599136,
-      "f1": 0.9660729765939002,
+      "accuracy": 0.46414145263318346,
+      "balanced_accuracy": 0.6286715251421126,
+      "precision": 0.9717661915930002,
+      "recall": 0.4393197944702716,
+      "f1": 0.6050887441024488,
       "roc_auc": 0.6947279661547391,
+      "recommended_threshold": 0.95,
+      "positive_prediction_rate": 0.42245255696974315,
       "average_precision": 0.9669519119062766,
       "brier_score": 0.05939554907085516
     },
     {
       "model_name": "logistic_regression",
-      "accuracy": 0.4753448670070879,
-      "balanced_accuracy": 0.629800601453275,
-      "precision": 0.9710056061667834,
-      "recall": 0.4520430633716663,
-      "f1": 0.616895764928488,
+      "accuracy": 0.6046414145263318,
+      "balanced_accuracy": 0.6465436589450764,
+      "precision": 0.965453707968678,
+      "recall": 0.5983198760296876,
+      "f1": 0.7387899997482313,
       "roc_auc": 0.6923289694303928,
+      "recommended_threshold": 0.45,
+      "positive_prediction_rate": 0.5791098239463456,
       "average_precision": 0.9662746913062319,
       "brier_score": 0.23417983412372534
     },
@@ -2151,6 +2284,8 @@
       "recall": 0.6117771796753936,
       "f1": 0.7481547975264313,
       "roc_auc": 0.681676159803347,
+      "recommended_threshold": 0.5,
+      "positive_prediction_rate": 0.5937809618169347,
       "average_precision": 0.9648781488484653,
       "brier_score": 0.20484511113656237
     }
@@ -2159,12 +2294,17 @@
     {
       "priority": "high",
       "action": "Monitor class imbalance before using the model for automated targeting.",
-      "expected_impact": "The dataset contains many reorder-positive examples, so accuracy alone can overstate model quality. Use recall, precision, and threshold analysis together."
+      "expected_impact": "The dataset contains many reorder-positive examples, so accuracy alone can overstate model quality. Use balanced accuracy, ROC AUC, and threshold analysis together."
     },
     {
       "priority": "medium",
       "action": "Add richer behavioral features such as recency, product affinity, and department mix.",
       "expected_impact": "Improves separation between likely reorders and customers who may churn."
+    },
+    {
+      "priority": "medium",
+      "action": "Tune the prediction threshold based on campaign goals.",
+      "expected_impact": "Lower thresholds catch more potential reorderers; higher thresholds reduce false positives for expensive retention campaigns."
     },
     {
       "priority": "medium",

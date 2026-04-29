@@ -124,10 +124,18 @@ TRANSLATIONS = {
             "Because repeat purchases dominate the dataset, balanced metrics and threshold analysis matter "
             "more than accuracy alone."
         ),
+        "metric_gap_warning": "Why Accuracy Looks Better Than Balanced Accuracy",
+        "metric_gap_warning_text": (
+            "The test set is heavily imbalanced: most examples are future reorders. A model can look accurate "
+            "by predicting reorder too often, while still missing the no-reorder class. Balanced accuracy gives "
+            "equal weight to both classes, so it is the better quality signal here."
+        ),
         "balanced_accuracy": "Balanced Accuracy",
         "average_precision": "Average Precision",
         "brier_score": "Brier Score",
+        "positive_prediction_rate": "Predicted Positive Rate",
         "recommended_threshold": "Recommended Threshold",
+        "threshold_selection_metric": "Threshold Selection",
         "threshold_analysis": "Threshold Analysis",
         "roc_curve": "ROC Curve",
         "precision_recall_curve": "Precision-Recall Curve",
@@ -326,10 +334,18 @@ TRANSLATIONS = {
             "Comme les rachats dominent le dataset, les metriques equilibrees et l'analyse des seuils sont "
             "plus importantes que l'accuracy seule."
         ),
+        "metric_gap_warning": "Pourquoi l'accuracy semble meilleure que l'accuracy equilibree",
+        "metric_gap_warning_text": (
+            "Le test set est fortement desequilibre: la plupart des exemples sont des recommandes futures. "
+            "Un modele peut sembler accurate en predisant trop souvent recommande, tout en detectant mal la "
+            "classe no-reorder. L'accuracy equilibree donne le meme poids aux deux classes."
+        ),
         "balanced_accuracy": "Accuracy equilibree",
         "average_precision": "Precision moyenne",
         "brier_score": "Score de Brier",
+        "positive_prediction_rate": "Taux predit positif",
         "recommended_threshold": "Seuil recommande",
+        "threshold_selection_metric": "Selection du seuil",
         "threshold_analysis": "Analyse des seuils",
         "roc_curve": "Courbe ROC",
         "precision_recall_curve": "Courbe precision-recall",
@@ -1458,11 +1474,34 @@ def render_model_summary_cards(metrics: dict[str, Any], feature_importance: pd.D
     with st.container(border=True):
         st.caption(translate("model_explanation"))
         st.write(translate("model_explanation_text"))
-        col_a, col_b, col_c = st.columns(3)
+        col_a, col_b, col_c, col_d = st.columns(4)
         col_a.metric(translate("positive_rate"), format_percent(metrics.get("positive_rate", 0)))
         col_b.metric(translate("recommended_threshold"), f"{float(metrics.get('recommended_threshold') or 0.5):.2f}")
-        col_c.metric(translate("selected_model"), str(metrics.get("selected_model") or "random_forest"))
+        col_c.metric(
+            translate("positive_prediction_rate"),
+            format_percent(metrics.get("positive_prediction_rate", metrics.get("positive_rate", 0))),
+        )
+        col_d.metric(translate("selected_model"), str(metrics.get("selected_model") or "random_forest"))
         st.caption(f"Top Driver: {top_feature}")
+
+
+def render_metric_gap_explanation(metrics: dict[str, Any]) -> None:
+    accuracy = float(metrics.get("accuracy") or 0)
+    balanced_accuracy = float(metrics.get("balanced_accuracy") or 0)
+    positive_rate = float(metrics.get("positive_rate") or 0)
+    positive_prediction_rate = float(metrics.get("positive_prediction_rate", positive_rate) or 0)
+
+    if accuracy - balanced_accuracy < 0.15 and positive_rate < 0.8:
+        return
+
+    with st.container(border=True):
+        st.markdown(f"**{translate('metric_gap_warning')}**")
+        st.write(translate("metric_gap_warning_text"))
+        gap_a, gap_b, gap_c, gap_d = st.columns(4)
+        gap_a.metric(translate("accuracy"), format_percent(accuracy))
+        gap_b.metric(translate("balanced_accuracy"), format_percent(balanced_accuracy))
+        gap_c.metric(translate("positive_rate"), format_percent(positive_rate))
+        gap_d.metric(translate("positive_prediction_rate"), format_percent(positive_prediction_rate))
 
 
 def build_model_comparison_frame(metrics: dict[str, Any]) -> pd.DataFrame:
@@ -1528,6 +1567,13 @@ def render_model_comparison(metrics: dict[str, Any]) -> None:
             "recall": st.column_config.ProgressColumn("Recall", format="%.3f", min_value=0, max_value=1),
             "f1": st.column_config.ProgressColumn("F1", format="%.3f", min_value=0, max_value=1),
             "roc_auc": st.column_config.ProgressColumn("ROC AUC", format="%.3f", min_value=0, max_value=1),
+            "recommended_threshold": st.column_config.NumberColumn("Recommended Threshold", format="%.2f"),
+            "positive_prediction_rate": st.column_config.ProgressColumn(
+                "Predicted Positive Rate",
+                format="%.3f",
+                min_value=0,
+                max_value=1,
+            ),
             "average_precision": st.column_config.ProgressColumn("Avg Precision", format="%.3f", min_value=0, max_value=1),
             "brier_score": st.column_config.NumberColumn("Brier", format="%.3f"),
         },
@@ -1563,6 +1609,7 @@ def render_model_performance(metrics: dict[str, Any], feature_importance: pd.Dat
 
     render_model_card()
     render_model_summary_cards(metrics, feature_importance)
+    render_metric_gap_explanation(metrics)
     render_model_comparison(metrics)
 
     accuracy, balanced_accuracy, precision, recall, f1_score, roc_auc = st.columns(6)
@@ -1612,7 +1659,7 @@ def render_model_performance(metrics: dict[str, Any], feature_importance: pd.Dat
                 render_line_chart(
                     pd.DataFrame(threshold_rows),
                     "threshold",
-                    ["precision", "recall", "f1"],
+                    ["precision", "recall", "f1", "balanced_accuracy"],
                     title=translate("threshold_analysis"),
                     y_title="Score",
                     height=330,
