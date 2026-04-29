@@ -178,6 +178,11 @@ TRANSLATIONS = {
             "Models are compared on the same train/test split. ROC AUC is used for selection, then F1, "
             "precision, recall, and calibration are reviewed for business tradeoffs."
         ),
+        "ml_glossary": "ML Metrics Glossary",
+        "ml_glossary_caption": "Plain-English definitions for the model metrics shown in this tab.",
+        "glossary_term": "Term",
+        "glossary_definition": "Definition",
+        "glossary_business_use": "How to use it",
         "ai_copilot": "AI Copilot",
         "ai_business_copilot": "AI Business Copilot",
         "ai_copilot_caption": "Ask business questions about churn, reorders, products, retention, and customer behavior.",
@@ -389,6 +394,11 @@ TRANSLATIONS = {
             "Les modeles sont compares sur le meme split train/test. ROC AUC sert a choisir le modele, puis F1, "
             "precision, recall et calibration sont analyses pour les compromis business."
         ),
+        "ml_glossary": "Glossaire des metriques ML",
+        "ml_glossary_caption": "Definitions simples des metriques affichees dans cet onglet.",
+        "glossary_term": "Terme",
+        "glossary_definition": "Definition",
+        "glossary_business_use": "Comment l'utiliser",
         "ai_copilot": "Copilot IA",
         "ai_business_copilot": "Copilot Business IA",
         "ai_copilot_caption": "Pose des questions business sur le churn, les recommandes, les produits, la retention et les clients.",
@@ -1504,6 +1514,151 @@ def render_metric_gap_explanation(metrics: dict[str, Any]) -> None:
         gap_d.metric(translate("positive_prediction_rate"), format_percent(positive_prediction_rate))
 
 
+def build_ml_glossary_rows() -> list[dict[str, str]]:
+    if get_language() == "fr":
+        return [
+            {
+                "term": "Accuracy",
+                "definition": "Part totale de predictions correctes.",
+                "business_use": "Utile comme vue rapide, mais trompeuse si une classe domine fortement.",
+            },
+            {
+                "term": "Balanced Accuracy",
+                "definition": "Moyenne de la performance sur les deux classes: reorder et no-reorder.",
+                "business_use": "Meilleure metrique ici, car le dataset contient beaucoup plus de reorders.",
+            },
+            {
+                "term": "Precision",
+                "definition": "Parmi les clients predits reorder, part qui reorder vraiment.",
+                "business_use": "A privilegier quand une campagne coute cher et qu'il faut eviter les faux positifs.",
+            },
+            {
+                "term": "Recall",
+                "definition": "Parmi les vrais reorder, part detectee par le modele.",
+                "business_use": "A privilegier quand on veut couvrir le plus grand nombre de clients pertinents.",
+            },
+            {
+                "term": "F1 Score",
+                "definition": "Equilibre entre precision et recall.",
+                "business_use": "Bon score de synthese quand precision et recall sont tous les deux importants.",
+            },
+            {
+                "term": "ROC AUC",
+                "definition": "Capacite du modele a classer un reorder au-dessus d'un no-reorder.",
+                "business_use": "Utile pour comparer les modeles independamment d'un seuil fixe.",
+            },
+            {
+                "term": "Average Precision",
+                "definition": "Resume la courbe precision-recall sur tous les seuils.",
+                "business_use": "Utile avec des classes desequilibrees et pour evaluer la qualite du ranking.",
+            },
+            {
+                "term": "Brier Score",
+                "definition": "Mesure l'erreur des probabilites predites. Plus bas est meilleur.",
+                "business_use": "Indique si les probabilites sont bien calibrees pour prioriser les clients.",
+            },
+            {
+                "term": "Positive Rate",
+                "definition": "Part de vrais cas reorder dans les donnees.",
+                "business_use": "Explique pourquoi l'accuracy peut paraitre elevee meme si le modele est faible.",
+            },
+            {
+                "term": "Predicted Positive Rate",
+                "definition": "Part des clients que le modele classe comme reorder.",
+                "business_use": "Aide a voir si le modele cible trop large ou trop strict.",
+            },
+            {
+                "term": "Recommended Threshold",
+                "definition": "Seuil de probabilite utilise pour convertir un score en prediction finale.",
+                "business_use": "Ajuste le compromis entre couverture client et precision de ciblage.",
+            },
+            {
+                "term": "Confusion Matrix",
+                "definition": "Table qui separe vrais positifs, faux positifs, vrais negatifs et faux negatifs.",
+                "business_use": "Montre concretement les types d'erreurs que le modele fait.",
+            },
+        ]
+
+    return [
+        {
+            "term": "Accuracy",
+            "definition": "Share of all predictions that are correct.",
+            "business_use": "Useful as a quick view, but misleading when one class dominates.",
+        },
+        {
+            "term": "Balanced Accuracy",
+            "definition": "Average performance across both classes: reorder and no-reorder.",
+            "business_use": "Better for this project because reorder examples dominate the dataset.",
+        },
+        {
+            "term": "Precision",
+            "definition": "Of customers predicted to reorder, the share that actually reorders.",
+            "business_use": "Use when campaigns are expensive and false positives should be limited.",
+        },
+        {
+            "term": "Recall",
+            "definition": "Of actual reorder customers, the share detected by the model.",
+            "business_use": "Use when the goal is broad coverage of relevant customers.",
+        },
+        {
+            "term": "F1 Score",
+            "definition": "Balance between precision and recall.",
+            "business_use": "Good summary when precision and recall both matter.",
+        },
+        {
+            "term": "ROC AUC",
+            "definition": "How well the model ranks reorder cases above no-reorder cases.",
+            "business_use": "Useful for comparing models without committing to one threshold.",
+        },
+        {
+            "term": "Average Precision",
+            "definition": "Summary of the precision-recall curve across thresholds.",
+            "business_use": "Useful with imbalanced classes and ranking-oriented use cases.",
+        },
+        {
+            "term": "Brier Score",
+            "definition": "Error of predicted probabilities. Lower is better.",
+            "business_use": "Shows whether probabilities are calibrated enough for prioritization.",
+        },
+        {
+            "term": "Positive Rate",
+            "definition": "Share of actual reorder cases in the data.",
+            "business_use": "Explains why accuracy can look high even when the model is weak.",
+        },
+        {
+            "term": "Predicted Positive Rate",
+            "definition": "Share of customers the model classifies as reorder.",
+            "business_use": "Shows whether the model targets too broadly or too narrowly.",
+        },
+        {
+            "term": "Recommended Threshold",
+            "definition": "Probability cutoff used to convert scores into final predictions.",
+            "business_use": "Controls the tradeoff between customer coverage and targeting precision.",
+        },
+        {
+            "term": "Confusion Matrix",
+            "definition": "Table separating true positives, false positives, true negatives, and false negatives.",
+            "business_use": "Makes the model's error types concrete.",
+        },
+    ]
+
+
+def render_ml_glossary() -> None:
+    with st.expander(translate("ml_glossary"), expanded=False):
+        st.caption(translate("ml_glossary_caption"))
+        glossary_frame = pd.DataFrame(build_ml_glossary_rows())
+        st.dataframe(
+            glossary_frame,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "term": st.column_config.TextColumn(translate("glossary_term"), width="medium"),
+                "definition": st.column_config.TextColumn(translate("glossary_definition"), width="large"),
+                "business_use": st.column_config.TextColumn(translate("glossary_business_use"), width="large"),
+            },
+        )
+
+
 def build_model_comparison_frame(metrics: dict[str, Any]) -> pd.DataFrame:
     comparison = metrics.get("model_comparison") or []
     if not comparison:
@@ -1626,6 +1781,7 @@ def render_model_performance(metrics: dict[str, Any], feature_importance: pd.Dat
     positive_rate.metric(translate("positive_rate"), format_percent(metrics.get("positive_rate", 0)))
     avg_precision.metric(translate("average_precision"), f"{float(metrics.get('average_precision') or 0):.3f}")
     brier_score.metric(translate("brier_score"), f"{float(metrics.get('brier_score') or 0):.3f}")
+    render_ml_glossary()
 
     st.divider()
 
