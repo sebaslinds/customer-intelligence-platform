@@ -5,8 +5,6 @@ sources:
     database: "{{ env_var('SNOWFLAKE_DATABASE') }}"
     schema: "{{ env_var('SNOWFLAKE_SCHEMA') }}"
     tables:
-      - name: raw_customers
-        description: Raw customer records loaded by the Python ingestion layer.
       - name: raw_instacart_orders
         description: Raw Instacart order records.
       - name: raw_instacart_order_products_train

@@ -43,3 +43,16 @@ models:
         description: Product display name.
         tests:
           - not_null
+
+  - name: stg_customers
+    description: Customer-level staging model derived from Instacart orders. The Instacart source has no separate customer profile table, so customer records are inferred from distinct user activity.
+    columns:
+      - name: user_id
+        description: Unique customer identifier inferred from order records.
+        tests:
+          - unique
+          - not_null
+      - name: order_count
+        description: Total number of observed orders for the customer.
+        tests:
+          - not_null
