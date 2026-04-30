@@ -1434,6 +1434,7 @@ def render_bar_chart(
     y_title: str | None = None,
     x_tick_angle: int = -25,
     height: int = 360,
+    label_format: str = ",.0f",
 ) -> None:
     if frame.empty:
         return
@@ -1455,7 +1456,7 @@ def render_bar_chart(
             tooltip=tooltip,
         )
     )
-    labels = bars.mark_text(dy=-8, color="#475569").encode(text=alt.Text(f"{y_column}:Q", format=",.0f"))
+    labels = bars.mark_text(dy=-8, color="#475569").encode(text=alt.Text(f"{y_column}:Q", format=label_format))
     chart = (bars + labels).properties(height=height)
     if title:
         chart = chart.properties(title=title)
@@ -2652,36 +2653,18 @@ def render_static_table(frame: pd.DataFrame, *, show_index: bool = False) -> Non
         return
 
     table_html = frame.to_html(index=show_index, escape=True, border=0)
+    html_block = (
+        "<style>"
+        ".responsive-static-table table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:0.92rem;}"
+        ".responsive-static-table th,.responsive-static-table td{border:1px solid #e5e7eb;padding:0.65rem 0.75rem;"
+        "text-align:left;vertical-align:top;white-space:normal;overflow-wrap:anywhere;word-break:break-word;}"
+        ".responsive-static-table th{background:#f9fafb;color:#6b7280;font-weight:500;}"
+        ".responsive-static-table tr:nth-child(even) td{background:#fcfcfd;}"
+        "</style>"
+        f'<div class="responsive-static-table">{table_html}</div>'
+    )
     st.markdown(
-        f"""
-        <style>
-            .responsive-static-table table {{
-                width: 100%;
-                table-layout: fixed;
-                border-collapse: collapse;
-                font-size: 0.92rem;
-            }}
-            .responsive-static-table th,
-            .responsive-static-table td {{
-                border: 1px solid #e5e7eb;
-                padding: 0.65rem 0.75rem;
-                text-align: left;
-                vertical-align: top;
-                white-space: normal;
-                overflow-wrap: anywhere;
-                word-break: break-word;
-            }}
-            .responsive-static-table th {{
-                background: #f9fafb;
-                color: #6b7280;
-                font-weight: 500;
-            }}
-            .responsive-static-table tr:nth-child(even) td {{
-                background: #fcfcfd;
-            }}
-        </style>
-        <div class="responsive-static-table">{table_html}</div>
-        """,
+        html_block,
         unsafe_allow_html=True,
     )
 
@@ -2691,6 +2674,80 @@ def format_static_metric(value: Any, *, decimals: int = 3) -> str:
         return f"{float(value):.{decimals}f}"
     except (TypeError, ValueError):
         return "0"
+
+
+def render_classification_report_visuals(report_frame: pd.DataFrame) -> None:
+    class_rows = report_frame[report_frame["class"].isin(["No Reorder", "Reorder", "Sans recommande", "Avec recommande"])]
+    if class_rows.empty:
+        class_rows = report_frame.head(2)
+
+    columns = st.columns(len(class_rows)) if len(class_rows) > 1 else [st]
+    for column, (_, row) in zip(columns, class_rows.iterrows(), strict=False):
+        with column:
+            with st.container(border=True):
+                st.caption(str(row["class"]))
+                score_columns = st.columns(3)
+                score_columns[0].metric(translate("precision"), format_percent(row["precision"]))
+                score_columns[1].metric(translate("recall"), format_percent(row["recall"]))
+                score_columns[2].metric("F1", format_percent(row["f1_score"]))
+                st.caption(
+                    ("Support: " if get_language() == "en" else "Volume: ")
+                    + format_number(row["support"])
+                )
+
+    chart_frame = report_frame.melt(
+        id_vars=["class"],
+        value_vars=["precision", "recall", "f1_score"],
+        var_name="metric",
+        value_name="score",
+    )
+    metric_labels = {
+        "precision": translate("precision"),
+        "recall": translate("recall"),
+        "f1_score": "F1",
+    }
+    chart_frame["metric_label"] = chart_frame["metric"].map(metric_labels)
+    chart = (
+        alt.Chart(chart_frame)
+        .mark_bar(cornerRadiusTopLeft=4, cornerRadiusTopRight=4)
+        .encode(
+            x=alt.X("class:N", axis=alt.Axis(title=None, labelAngle=-15, labelLimit=150)),
+            xOffset=alt.XOffset("metric_label:N"),
+            y=alt.Y("score:Q", axis=alt.Axis(title="Score", format="%"), scale=alt.Scale(domain=[0, 1])),
+            color=alt.Color("metric_label:N", title="Metric" if get_language() == "en" else "Metrique"),
+            tooltip=[
+                alt.Tooltip("class:N", title="Class" if get_language() == "en" else "Classe"),
+                alt.Tooltip("metric_label:N", title="Metric" if get_language() == "en" else "Metrique"),
+                alt.Tooltip("score:Q", title="Score", format=".1%"),
+            ],
+        )
+        .properties(height=280)
+    )
+    st.altair_chart(chart, use_container_width=True)
+
+
+def render_feature_driver_cards(feature_importance: pd.DataFrame) -> None:
+    top_features = feature_importance.head(3).copy()
+    if top_features.empty:
+        return
+
+    columns = st.columns(len(top_features))
+    for rank, (column, (_, row)) in enumerate(zip(columns, top_features.iterrows(), strict=False), start=1):
+        with column:
+            with st.container(border=True):
+                st.caption(f"#{rank}")
+                st.markdown(f"**{format_feature_label(row['feature'])}**")
+                st.metric("Importance", f"{float(row['importance']):.3f}")
+
+    top_share = float(top_features["importance"].sum())
+    explanation = (
+        f"The top 3 drivers explain {top_share:.1%} of the model signal. "
+        "If this concentration is high, monitor drift and add broader customer/product features."
+        if get_language() == "en"
+        else f"Les 3 premiers signaux representent {top_share:.1%} de l'importance du modele. "
+        "Si cette concentration est elevee, surveille le drift et ajoute des features client/produit plus riches."
+    )
+    st.caption(explanation)
 
 
 def render_model_performance(metrics: dict[str, Any], feature_importance: pd.DataFrame) -> None:
@@ -2799,6 +2856,12 @@ def render_model_performance(metrics: dict[str, Any], feature_importance: pd.Dat
     report_frame = build_classification_report_frame(metrics)
     if not report_frame.empty:
         st.subheader(translate("classification_report"))
+        st.caption(
+            "The cards compare how the model behaves on each class; the table keeps the technical details."
+            if get_language() == "en"
+            else "Les cartes comparent le comportement du modele par classe; le tableau garde le detail technique."
+        )
+        render_classification_report_visuals(report_frame)
         report_display = report_frame.rename(
             columns={
                 "class": "Class" if get_language() == "en" else "Classe",
@@ -2814,7 +2877,8 @@ def render_model_performance(metrics: dict[str, Any], feature_importance: pd.Dat
         support_column = "Support" if get_language() == "en" else "Volume"
         if support_column in report_display:
             report_display[support_column] = report_display[support_column].map(format_number)
-        render_static_table(report_display)
+        with st.expander("Technical report table" if get_language() == "en" else "Table technique du rapport"):
+            render_static_table(report_display)
 
     recommendations = metrics.get("model_recommendations") or build_default_ml_recommendations(
         metrics,
@@ -2827,15 +2891,18 @@ def render_model_performance(metrics: dict[str, Any], feature_importance: pd.Dat
     if not feature_importance.empty:
         st.subheader(translate("feature_importance"))
         st.caption(translate("feature_importance_help"))
+        render_feature_driver_cards(feature_importance)
         chart_data = feature_importance[["feature", "importance"]].copy()
         chart_data["feature_label"] = chart_data["feature"].map(format_feature_label)
+        visible_chart_data = chart_data.head(12)
         render_bar_chart(
-            chart_data,
+            visible_chart_data,
             "feature_label",
             "importance",
             y_title="Importance",
             x_tick_angle=-15,
             height=390,
+            label_format=".3f",
         )
         table_data = chart_data.rename(
             columns={
@@ -2851,7 +2918,8 @@ def render_model_performance(metrics: dict[str, Any], feature_importance: pd.Dat
             }
         )
         importance_display["Importance"] = importance_display["Importance"].map(format_static_metric)
-        render_static_table(importance_display)
+        with st.expander("Technical feature table" if get_language() == "en" else "Table technique des features"):
+            render_static_table(importance_display)
 
 
 def render_copilot_response(response: dict[str, Any], message_index: int | None = None) -> None:
