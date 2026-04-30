@@ -34,7 +34,7 @@ This project demonstrates how a modern data stack can convert raw transaction da
 - Advanced analytics marts for retention, churn probability, and customer lifetime value
 - ML training pipeline that compares Gradient Boosting, Random Forest, and Logistic Regression
 - Reorder prediction model with model card, feature importance, confusion matrix, threshold guidance, and recommendations
-- FastAPI service with `/health`, `/predict`, and `/copilot/insights`
+- FastAPI service with public `/health` plus protected `/predict`, `/decision`, and `/copilot/insights`
 - Decision Engine service with `/decision` for alerts and recommendations
 - Streamlit dashboard deployed on Streamlit Cloud
 - AI copilot powered by OpenAI/Gemini where configured and grounded in Snowflake metrics
@@ -417,7 +417,13 @@ GEMINI_API_KEY=
 GEMINI_MODEL=gemini-1.5-flash
 MODEL_PATH=ml/artifacts/random_forest_reorder_model.joblib
 API_BASE_URL=http://localhost:8000
+API_AUTH_ENABLED=false
+API_KEY=
+API_RATE_LIMIT_PER_MINUTE=60
 ```
+
+Set `API_AUTH_ENABLED=true` and provide `API_KEY` when you want to protect `/predict`,
+`/decision`, and `/copilot/insights`. The `/health` endpoint remains public for uptime checks.
 
 ## Running Locally
 
@@ -481,6 +487,9 @@ SNOWFLAKE_SCHEMA
 OPENAI_API_KEY
 OPENAI_MODEL
 MODEL_PATH=ml/artifacts/random_forest_reorder_model.joblib
+API_AUTH_ENABLED=true
+API_KEY
+API_RATE_LIMIT_PER_MINUTE=60
 ```
 
 ### Streamlit Cloud
@@ -515,6 +524,8 @@ Workflow file:
 - Store production secrets in Render, Streamlit Cloud, and GitHub repository secrets.
 - Rotate Snowflake, OpenAI, and Kaggle credentials if they are exposed in screenshots, logs, or chat.
 - Keep raw data out of Git unless it is intentionally sampled and safe to share.
+- Protected API routes support `X-API-Key` authentication and per-client rate limiting.
+- Keep `/health` unauthenticated so Render, Streamlit, and monitoring tools can check service status.
 
 ## Limitations
 
@@ -529,7 +540,7 @@ Workflow file:
 ## Future Improvements
 
 - Store model artifacts in Snowflake stage, S3, or a model registry
-- Add API authentication and rate limiting
+- Move API rate limiting to Redis or another shared store for multi-instance deployments
 - Add historical model evaluation tracking
 - Add model drift monitoring
 - Add SHAP or permutation importance for clearer model explanations

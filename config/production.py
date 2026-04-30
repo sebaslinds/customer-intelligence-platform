@@ -22,3 +22,6 @@ def validate_production_settings(settings: Settings) -> None:
     if missing:
         formatted = ", ".join(missing)
         raise ValueError(f"Missing required production configuration: {formatted}")
+
+    if settings.api_auth_enabled and not settings.api_key:
+        raise ValueError("Missing required production configuration: api_key")

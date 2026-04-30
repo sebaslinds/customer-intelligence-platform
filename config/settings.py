@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     api_base_url: str = "http://localhost:8000"
+    api_key: str | None = None
+    api_auth_enabled: bool = False
+    api_rate_limit_per_minute: int = 60
     model_path: str = "ml/artifacts/random_forest_reorder_model.joblib"
     openai_api_key: str | None = None
     openai_model: str = "gpt-4.1-mini"
