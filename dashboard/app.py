@@ -2647,6 +2647,52 @@ def render_model_card() -> None:
                 st.write(translate(value_key))
 
 
+def render_static_table(frame: pd.DataFrame, *, show_index: bool = False) -> None:
+    if frame.empty:
+        return
+
+    table_html = frame.to_html(index=show_index, escape=True, border=0)
+    st.markdown(
+        f"""
+        <style>
+            .responsive-static-table table {{
+                width: 100%;
+                table-layout: fixed;
+                border-collapse: collapse;
+                font-size: 0.92rem;
+            }}
+            .responsive-static-table th,
+            .responsive-static-table td {{
+                border: 1px solid #e5e7eb;
+                padding: 0.65rem 0.75rem;
+                text-align: left;
+                vertical-align: top;
+                white-space: normal;
+                overflow-wrap: anywhere;
+                word-break: break-word;
+            }}
+            .responsive-static-table th {{
+                background: #f9fafb;
+                color: #6b7280;
+                font-weight: 500;
+            }}
+            .responsive-static-table tr:nth-child(even) td {{
+                background: #fcfcfd;
+            }}
+        </style>
+        <div class="responsive-static-table">{table_html}</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def format_static_metric(value: Any, *, decimals: int = 3) -> str:
+    try:
+        return f"{float(value):.{decimals}f}"
+    except (TypeError, ValueError):
+        return "0"
+
+
 def render_model_performance(metrics: dict[str, Any], feature_importance: pd.DataFrame) -> None:
     st.subheader(translate("model_performance"))
     if not metrics:
@@ -2701,7 +2747,13 @@ def render_model_performance(metrics: dict[str, Any], feature_importance: pd.Dat
             ),
         )
         with st.expander(translate("confusion_matrix")):
-            st.dataframe(confusion_frame, use_container_width=True)
+            confusion_display = confusion_frame.reset_index()
+            confusion_display.columns = (
+                ["Actual", "Predicted No Reorder", "Predicted Reorder"]
+                if get_language() == "en"
+                else ["Reel", "Predit sans recommande", "Predit avec recommande"]
+            )
+            render_static_table(confusion_display)
 
     threshold_rows = metrics.get("threshold_analysis") or []
     roc_rows = metrics.get("roc_curve") or []
@@ -2747,18 +2799,22 @@ def render_model_performance(metrics: dict[str, Any], feature_importance: pd.Dat
     report_frame = build_classification_report_frame(metrics)
     if not report_frame.empty:
         st.subheader(translate("classification_report"))
-        st.dataframe(
-            report_frame,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
+        report_display = report_frame.rename(
+            columns={
                 "class": "Class" if get_language() == "en" else "Classe",
-                "precision": st.column_config.ProgressColumn(translate("precision"), format="%.3f", min_value=0, max_value=1),
-                "recall": st.column_config.ProgressColumn(translate("recall"), format="%.3f", min_value=0, max_value=1),
-                "f1_score": st.column_config.ProgressColumn("F1", format="%.3f", min_value=0, max_value=1),
-                "support": st.column_config.NumberColumn("Support" if get_language() == "en" else "Volume", format="%d"),
-            },
+                "precision": translate("precision"),
+                "recall": translate("recall"),
+                "f1_score": "F1",
+                "support": "Support" if get_language() == "en" else "Volume",
+            }
         )
+        for column in [translate("precision"), translate("recall"), "F1"]:
+            if column in report_display:
+                report_display[column] = report_display[column].map(format_static_metric)
+        support_column = "Support" if get_language() == "en" else "Volume"
+        if support_column in report_display:
+            report_display[support_column] = report_display[support_column].map(format_number)
+        render_static_table(report_display)
 
     recommendations = metrics.get("model_recommendations") or build_default_ml_recommendations(
         metrics,
@@ -2787,21 +2843,15 @@ def render_model_performance(metrics: dict[str, Any], feature_importance: pd.Dat
                 "feature": "technical_feature",
             }
         )
-        st.dataframe(
-            table_data[["feature_display", "technical_feature", "importance"]],
-            use_container_width=True,
-            hide_index=True,
-            column_config={
+        importance_display = table_data[["feature_display", "technical_feature", "importance"]].rename(
+            columns={
                 "feature_display": "Feature" if get_language() == "en" else "Feature affichee",
                 "technical_feature": "Technical name" if get_language() == "en" else "Nom technique",
-                "importance": st.column_config.ProgressColumn(
-                    "Importance",
-                    format="%.3f",
-                    min_value=0,
-                    max_value=1,
-                ),
-            },
+                "importance": "Importance",
+            }
         )
+        importance_display["Importance"] = importance_display["Importance"].map(format_static_metric)
+        render_static_table(importance_display)
 
 
 def render_copilot_response(response: dict[str, Any], message_index: int | None = None) -> None:
