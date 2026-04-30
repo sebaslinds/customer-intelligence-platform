@@ -30,6 +30,9 @@ FEATURE_IMPORTANCE_PATH = PROJECT_ROOT / "ml" / "artifacts" / "feature_importanc
 COPILOT_TIMEOUT_SECONDS = 60
 API_HEALTH_TIMEOUT_SECONDS = 45
 DECISION_TIMEOUT_SECONDS = 45
+CARBON_GCO2E_PER_1K_CHARS = 0.002
+CARBON_GCO2E_PER_AI_REQUEST = 0.2
+CARBON_GCO2E_PER_DECISION_RUN = 0.05
 STREAMLIT_APP_URL = "https://customer-intelligence-platform-d2pmcjetsrlgm2zwep7vgf.streamlit.app/"
 RENDER_API_URL = "https://customer-intelligence-platform-3v6q.onrender.com"
 
@@ -285,6 +288,24 @@ TRANSLATIONS = {
         "detailed_insights": "Detailed Insights",
         "evidence": "Evidence",
         "follow_up_questions": "Follow-up questions",
+        "carbon_footprint": "Estimated carbon footprint",
+        "conversation_carbon": "Conversation carbon estimate",
+        "decision_carbon": "Decision Engine carbon estimate",
+        "carbon_estimate_help": (
+            "Directional estimate based on text length, message count, and AI requests. "
+            "This is not a certified emissions measurement."
+        ),
+        "carbon_estimated_co2e": "Estimated gCO2e",
+        "carbon_messages": "Messages",
+        "carbon_text_units": "Text units",
+        "carbon_ai_calls": "AI calls",
+        "carbon_decision_runs": "Decision runs",
+        "carbon_assumptions": "Assumptions",
+        "carbon_assumptions_text": (
+            "Formula: text volume times a small text-processing factor, plus a fixed estimate per AI request "
+            "and per Decision Engine run. Use it as a directional sustainability signal, not as audited carbon accounting."
+        ),
+        "carbon_low_note": "Lower impact: reuse context, ask focused questions, and avoid unnecessary regenerations.",
         "decision_engine": "Decision Engine",
         "decision_engine_caption": "Turn anomaly signals into prioritized alerts, recommendations, and AI explanations.",
         "scenario_inputs": "Scenario Inputs",
@@ -593,6 +614,26 @@ TRANSLATIONS = {
         "detailed_insights": "Insights détaillés",
         "evidence": "Evidence",
         "follow_up_questions": "Questions de suivi",
+        "carbon_footprint": "Empreinte carbone estimee",
+        "conversation_carbon": "Estimation carbone de la conversation",
+        "decision_carbon": "Estimation carbone du moteur de decision",
+        "carbon_estimate_help": (
+            "Estimation directionnelle basee sur la longueur du texte, le nombre de messages et les appels IA. "
+            "Ce n'est pas une mesure carbone certifiee."
+        ),
+        "carbon_estimated_co2e": "gCO2e estime",
+        "carbon_messages": "Messages",
+        "carbon_text_units": "Unites de texte",
+        "carbon_ai_calls": "Appels IA",
+        "carbon_decision_runs": "Executions decision",
+        "carbon_assumptions": "Hypotheses",
+        "carbon_assumptions_text": (
+            "Formule: volume de texte multiplie par un facteur de traitement, plus une estimation fixe par appel IA "
+            "et par execution du moteur de decision. A utiliser comme signal durable directionnel, pas comme audit carbone."
+        ),
+        "carbon_low_note": (
+            "Impact plus faible: reutiliser le contexte, poser des questions ciblees et eviter les regenerations inutiles."
+        ),
         "decision_engine": "Moteur de decision",
         "decision_engine_caption": "Transforme les anomalies en alertes priorisees, recommandations et explications IA.",
         "scenario_inputs": "Scenario de test",
@@ -1160,6 +1201,76 @@ def get_language() -> str:
 def translate(key: str) -> str:
     language = get_language()
     return TRANSLATIONS.get(language, TRANSLATIONS["en"]).get(key, TRANSLATIONS["en"].get(key, key))
+
+
+def count_text_characters(value: Any) -> int:
+    if value is None:
+        return 0
+    if isinstance(value, str):
+        return len(value)
+    if isinstance(value, dict):
+        return sum(count_text_characters(item) for item in value.values())
+    if isinstance(value, list):
+        return sum(count_text_characters(item) for item in value)
+    return len(str(value))
+
+
+def estimate_carbon_footprint(
+    text_characters: int,
+    message_count: int = 0,
+    ai_calls: int = 0,
+    decision_runs: int = 0,
+) -> dict[str, Any]:
+    text_units = text_characters / 1000
+    estimated_gco2e = (
+        text_units * CARBON_GCO2E_PER_1K_CHARS
+        + ai_calls * CARBON_GCO2E_PER_AI_REQUEST
+        + decision_runs * CARBON_GCO2E_PER_DECISION_RUN
+    )
+    return {
+        "estimated_gco2e": estimated_gco2e,
+        "message_count": message_count,
+        "text_units": text_units,
+        "ai_calls": ai_calls,
+        "decision_runs": decision_runs,
+    }
+
+
+def format_carbon_value(value: float) -> str:
+    if value < 0.01:
+        return "<0.01 gCO2e"
+    return f"{value:.2f} gCO2e"
+
+
+def render_carbon_estimate(title: str, footprint: dict[str, Any]) -> None:
+    with st.expander(title, expanded=False):
+        st.caption(translate("carbon_estimate_help"))
+        metric_columns = st.columns(4)
+        metric_columns[0].metric(
+            translate("carbon_estimated_co2e"),
+            format_carbon_value(float(footprint.get("estimated_gco2e") or 0)),
+        )
+        if footprint.get("decision_runs"):
+            metric_columns[1].metric(
+                translate("carbon_decision_runs"),
+                format_number(int(footprint.get("decision_runs") or 0)),
+            )
+        else:
+            metric_columns[1].metric(
+                translate("carbon_messages"),
+                format_number(int(footprint.get("message_count") or 0)),
+            )
+        metric_columns[2].metric(
+            translate("carbon_text_units"),
+            f"{float(footprint.get('text_units') or 0):.1f}k",
+        )
+        metric_columns[3].metric(
+            translate("carbon_ai_calls"),
+            format_number(int(footprint.get("ai_calls") or 0)),
+        )
+        st.markdown(f"**{translate('carbon_assumptions')}**")
+        st.write(translate("carbon_assumptions_text"))
+        st.caption(translate("carbon_low_note"))
 
 
 def translate_copilot_question(question: str) -> str:
@@ -3026,6 +3137,16 @@ def render_ai_copilot() -> None:
             else:
                 st.write(content)
 
+    conversation_messages = st.session_state.copilot_messages
+    render_carbon_estimate(
+        translate("conversation_carbon"),
+        estimate_carbon_footprint(
+            text_characters=count_text_characters(conversation_messages),
+            message_count=len(conversation_messages),
+            ai_calls=sum(1 for message in conversation_messages if message.get("role") == "user"),
+        ),
+    )
+
     question = st.chat_input(translate("ask_ai"))
     pending_question = st.session_state.pop("pending_copilot_question", None)
     question = question or pending_question
@@ -3143,6 +3264,15 @@ def render_decision_engine(kpis: dict[str, Any]) -> None:
     summary_columns[1].metric(translate("priority_alerts"), format_number(len(alerts)))
     summary_columns[2].metric(translate("decision_recommendations"), format_number(len(recommendations)))
     summary_columns[3].metric(translate("explanation_source"), explanation_source)
+
+    render_carbon_estimate(
+        translate("decision_carbon"),
+        estimate_carbon_footprint(
+            text_characters=count_text_characters(response),
+            ai_calls=1 if response.get("gemini_requested") else 0,
+            decision_runs=1,
+        ),
+    )
 
     gemini_requested = bool(response.get("gemini_requested"))
     gemini_configured = bool(response.get("gemini_configured"))
