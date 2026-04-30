@@ -24,6 +24,13 @@ def test_build_training_matrix_uses_ordered_feature_columns() -> None:
             "weekend_order_ratio": [0.0, 0.5, 0.0, 0.5],
             "evening_order_ratio": [0.0, 0.0, 0.5, 0.0],
             "prior_reorder_order_ratio": [0.0, 0.0, 0.5, 0.5],
+            "unique_products": [4, 2, 8, 3],
+            "unique_departments": [2, 1, 3, 2],
+            "unique_aisles": [4, 2, 5, 3],
+            "produce_item_ratio": [0.4, 0.0, 0.6, 0.2],
+            "dairy_eggs_item_ratio": [0.1, 0.2, 0.0, 0.3],
+            "fresh_fruits_item_ratio": [0.3, 0.0, 0.4, 0.1],
+            "fresh_vegetables_item_ratio": [0.1, 0.0, 0.2, 0.1],
             "will_reorder": [1, 0, 1, 0],
         }
     )

@@ -693,6 +693,12 @@ FEATURE_STORE_COLUMN_TYPES = {
     "reorder_ratio": "float",
     "reorder_order_ratio": "float",
     "unique_products": "number",
+    "unique_departments": "number",
+    "unique_aisles": "number",
+    "produce_item_ratio": "float",
+    "dairy_eggs_item_ratio": "float",
+    "fresh_fruits_item_ratio": "float",
+    "fresh_vegetables_item_ratio": "float",
     "days_between_orders": "float",
     "stddev_days_between_orders": "float",
     "customer_tenure_days": "float",
@@ -1268,6 +1274,140 @@ def translate_decision_record(record: dict[str, Any]) -> dict[str, Any]:
     return localized_record
 
 
+FEATURE_LABELS = {
+    "en": {
+        "total_orders": "Total Orders",
+        "observed_basket_orders": "Documented Basket Orders",
+        "avg_basket_size": "Average Basket Size",
+        "reorder_ratio": "Reorder Ratio",
+        "days_between_orders": "Days Between Orders",
+        "stddev_days_between_orders": "Order Gap Variability",
+        "days_since_last_order": "Days Since Previous Order",
+        "customer_tenure_days": "Observed Customer Tenure",
+        "order_frequency_30d": "30-Day Order Frequency",
+        "avg_order_dow": "Average Order Day",
+        "avg_order_hour_of_day": "Average Order Hour",
+        "weekend_order_ratio": "Weekend Order Share",
+        "evening_order_ratio": "Evening Order Share",
+        "prior_reorder_order_ratio": "Prior Reorder Order Share",
+        "unique_products": "Unique Products",
+        "unique_departments": "Unique Departments",
+        "unique_aisles": "Unique Aisles",
+        "produce_item_ratio": "Produce Item Share",
+        "dairy_eggs_item_ratio": "Dairy/Eggs Item Share",
+        "fresh_fruits_item_ratio": "Fresh Fruits Item Share",
+        "fresh_vegetables_item_ratio": "Fresh Vegetables Item Share",
+    },
+    "fr": {
+        "total_orders": "Commandes",
+        "observed_basket_orders": "Paniers documentes",
+        "avg_basket_size": "Taille moyenne du panier",
+        "reorder_ratio": "Taux de recommande",
+        "days_between_orders": "Jours entre commandes",
+        "stddev_days_between_orders": "Variabilite du delai",
+        "days_since_last_order": "Jours depuis la commande precedente",
+        "customer_tenure_days": "Anciennete observee",
+        "order_frequency_30d": "Frequence sur 30 jours",
+        "avg_order_dow": "Jour moyen de commande",
+        "avg_order_hour_of_day": "Heure moyenne de commande",
+        "weekend_order_ratio": "Part commandes week-end",
+        "evening_order_ratio": "Part commandes soir/nuit",
+        "prior_reorder_order_ratio": "Part commandes avec rachat",
+        "unique_products": "Produits uniques",
+        "unique_departments": "Departements uniques",
+        "unique_aisles": "Rayons uniques",
+        "produce_item_ratio": "Part articles fruits/legumes",
+        "dairy_eggs_item_ratio": "Part laitier/oeufs",
+        "fresh_fruits_item_ratio": "Part fruits frais",
+        "fresh_vegetables_item_ratio": "Part legumes frais",
+    },
+}
+
+
+ML_TEXT_TRANSLATIONS_FR = {
+    "Monitor class imbalance before using the model for automated targeting.": (
+        "Surveiller le desequilibre des classes avant d'utiliser le modele pour du ciblage automatise."
+    ),
+    "The dataset contains many reorder-positive examples, so accuracy alone can overstate model quality. Use balanced accuracy, ROC AUC, and threshold analysis together.": (
+        "Le dataset contient beaucoup d'exemples positifs de recommande; l'accuracy seule peut donc surestimer la qualite du modele. Utilise ensemble l'accuracy equilibree, le ROC AUC et l'analyse des seuils."
+    ),
+    "Repeat-order examples dominate the training data, so use precision, recall, and threshold tradeoffs instead of accuracy alone.": (
+        "Les exemples de recommande dominent les donnees d'entrainement; utilise les compromis precision, recall et seuil plutot que l'accuracy seule."
+    ),
+    "Treat the current classifier as a ranking signal, not a final automated decision.": (
+        "Traiter le classifieur actuel comme un signal de priorisation, pas comme une decision automatisee finale."
+    ),
+    "Balanced accuracy is close to random because the no-reorder class is hard to detect. Use the probability score for prioritization until richer negative-class features are added.": (
+        "L'accuracy equilibree est proche du hasard, car la classe sans recommande est difficile a detecter. Utilise le score de probabilite pour prioriser jusqu'a l'ajout de features plus riches pour la classe negative."
+    ),
+    "Add richer behavioral features such as recency, product affinity, and department mix.": (
+        "Ajouter des features comportementales plus riches comme la recence, l'affinite produit et le mix departement."
+    ),
+    "Add richer features: recency, product affinity, department mix, and last-order behavior.": (
+        "Ajouter des features plus riches: recence, affinite produit, mix departement et comportement de la derniere commande."
+    ),
+    "Improves separation between likely reorders and customers who may churn.": (
+        "Ameliore la separation entre les clients susceptibles de recommander et ceux qui risquent de churner."
+    ),
+    "Better features should improve separation between reorder and churn-risk behavior.": (
+        "De meilleures features devraient mieux separer les comportements de recommande et de risque de churn."
+    ),
+    "Tune the prediction threshold based on campaign goals.": (
+        "Ajuster le seuil de prediction selon les objectifs de campagne."
+    ),
+    "Tune the classification threshold before launching retention campaigns.": (
+        "Ajuster le seuil de classification avant de lancer des campagnes de retention."
+    ),
+    "Lower thresholds catch more potential reorderers; higher thresholds reduce false positives for expensive retention campaigns.": (
+        "Un seuil plus bas couvre plus de clients susceptibles de recommander; un seuil plus haut reduit les faux positifs pour les campagnes couteuses."
+    ),
+    "Lower thresholds improve coverage; higher thresholds reduce false positives for costly campaigns.": (
+        "Un seuil plus bas augmente la couverture; un seuil plus haut reduit les faux positifs pour les campagnes couteuses."
+    ),
+    "Reduce dependence on only a few features.": (
+        "Reduire la dependance a quelques features seulement."
+    ),
+    "Reduce reliance on only the top features.": (
+        "Reduire la dependance aux features dominantes."
+    ),
+    "A broader feature set usually makes the model more stable and easier to explain to business users.": (
+        "Un ensemble de features plus large rend generalement le modele plus stable et plus facile a expliquer aux utilisateurs business."
+    ),
+    "A broader signal set makes predictions more stable and more explainable.": (
+        "Un ensemble de signaux plus large rend les predictions plus stables et plus explicables."
+    ),
+}
+
+
+def format_feature_label(feature_name: Any) -> str:
+    text_value = "" if feature_name is None else str(feature_name)
+    labels = FEATURE_LABELS.get(get_language(), FEATURE_LABELS["en"])
+    return labels.get(text_value, text_value.replace("_", " ").title())
+
+
+def translate_ml_text(value: Any) -> str:
+    text_value = "" if value is None else str(value)
+    if get_language() != "fr":
+        return text_value
+    return ML_TEXT_TRANSLATIONS_FR.get(text_value, text_value)
+
+
+def metric_display_label(metric_name: str) -> str:
+    labels = {
+        "accuracy": translate("accuracy"),
+        "balanced_accuracy": translate("balanced_accuracy"),
+        "precision": translate("precision"),
+        "recall": translate("recall"),
+        "f1": translate("f1_score"),
+        "roc_auc": translate("roc_auc"),
+        "average_precision": translate("average_precision"),
+        "brier_score": translate("brier_score"),
+        "recommended_threshold": translate("recommended_threshold"),
+        "positive_prediction_rate": translate("positive_prediction_rate"),
+    }
+    return labels.get(metric_name, metric_name.replace("_", " ").title())
+
+
 def toggle_language() -> None:
     st.session_state.language = "fr" if get_language() == "en" else "en"
     st.rerun()
@@ -1449,9 +1589,9 @@ def render_recommendation_cards(recommendations: list[dict[str, Any]]) -> None:
             priority = str(recommendation.get("priority") or "medium")
             with column.container(border=True):
                 st.caption(format_priority_label(priority))
-                st.markdown(f"**{recommendation.get('action', '')}**")
+                st.markdown(f"**{translate_ml_text(recommendation.get('action', ''))}**")
                 if expected_impact := recommendation.get("expected_impact"):
-                    st.write(expected_impact)
+                    st.write(translate_ml_text(expected_impact))
 
 
 def render_decision_cards(decisions: list[dict[str, Any]]) -> None:
@@ -1705,23 +1845,21 @@ def render_segment_metric_cards(segment_frame: pd.DataFrame) -> None:
 
     st.markdown(f"**{translate('customer_segment_snapshot')}**")
     display_frame = segment_frame.sort_values("users", ascending=False)
-    for row_start in range(0, len(display_frame), 2):
-        row_segments = display_frame.iloc[row_start : row_start + 2]
-        columns = st.columns(len(row_segments))
-        for column, (_, row) in zip(columns, row_segments.iterrows(), strict=False):
-            with column.container(border=True):
-                st.markdown(f"**{get_row_value(row, 'customer_segment_label', '')}**")
-                metric_columns = st.columns(4)
-                metric_columns[0].metric(translate("users"), format_number(get_row_value(row, "users")))
-                metric_columns[1].metric(translate("avg_orders"), format_number(get_row_value(row, "avg_total_orders")))
-                metric_columns[2].metric(
-                    translate("avg_reorder_ratio"),
-                    format_percent(get_row_value(row, "avg_reorder_ratio")),
+    for _, row in display_frame.iterrows():
+        with st.container(border=True):
+            st.markdown(f"**{get_row_value(row, 'customer_segment_label', '')}**")
+            st.caption(
+                " | ".join(
+                    [
+                        f"{translate('users')}: {format_number(get_row_value(row, 'users'))}",
+                        f"{translate('avg_orders')}: {format_number(get_row_value(row, 'avg_total_orders'))}",
+                        f"{translate('avg_reorder_ratio')}: "
+                        f"{format_percent(get_row_value(row, 'avg_reorder_ratio'))}",
+                        f"{translate('avg_observed_coverage')}: "
+                        f"{format_percent(get_row_value(row, 'avg_observed_basket_coverage'))}",
+                    ]
                 )
-                metric_columns[3].metric(
-                    translate("avg_observed_coverage"),
-                    format_percent(get_row_value(row, "avg_observed_basket_coverage")),
-                )
+            )
 
 
 def render_customer_segment_summary(segment_summary: pd.DataFrame) -> None:
@@ -2100,12 +2238,20 @@ def build_confusion_summary(confusion_matrix: list[list[int]]) -> dict[str, int]
 def build_classification_report_frame(metrics: dict[str, Any]) -> pd.DataFrame:
     report = metrics.get("classification_report") or {}
     rows = []
-    labels = {
-        "0": "No Reorder",
-        "1": "Reorder",
-        "macro avg": "Macro Avg",
-        "weighted avg": "Weighted Avg",
-    }
+    if get_language() == "fr":
+        labels = {
+            "0": "Sans recommande",
+            "1": "Avec recommande",
+            "macro avg": "Moyenne macro",
+            "weighted avg": "Moyenne ponderee",
+        }
+    else:
+        labels = {
+            "0": "No Reorder",
+            "1": "Reorder",
+            "macro avg": "Macro Avg",
+            "weighted avg": "Weighted Avg",
+        }
     for key, label in labels.items():
         values = report.get(key)
         if not isinstance(values, dict):
@@ -2219,7 +2365,7 @@ def render_line_chart(
 def render_model_summary_cards(metrics: dict[str, Any], feature_importance: pd.DataFrame) -> None:
     top_feature = "N/A"
     if not feature_importance.empty:
-        top_feature = str(feature_importance.iloc[0]["feature"]).replace("_", " ").title()
+        top_feature = format_feature_label(feature_importance.iloc[0]["feature"])
 
     with st.container(border=True):
         st.caption(translate("model_explanation"))
@@ -2232,7 +2378,8 @@ def render_model_summary_cards(metrics: dict[str, Any], feature_importance: pd.D
             format_percent(metrics.get("positive_prediction_rate", metrics.get("positive_rate", 0))),
         )
         col_d.metric(translate("selected_model"), str(metrics.get("selected_model") or "random_forest"))
-        st.caption(f"Top Driver: {top_feature}")
+        top_driver_label = "Top Driver" if get_language() == "en" else "Variable principale"
+        st.caption(f"{top_driver_label}: {top_feature}")
 
 
 def render_metric_gap_explanation(metrics: dict[str, Any]) -> None:
@@ -2433,18 +2580,22 @@ def render_model_comparison(metrics: dict[str, Any]) -> None:
         var_name="metric",
         value_name="score",
     )
+    chart_frame["metric_label"] = chart_frame["metric"].map(metric_display_label)
+    model_title = "Model" if get_language() == "en" else "Modele"
+    metric_title = "Metric" if get_language() == "en" else "Metrique"
+    score_title = "Score"
     chart = (
         alt.Chart(chart_frame)
         .mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3)
         .encode(
             x=alt.X("model_name:N", axis=alt.Axis(title=None, labelAngle=-15), sort=None),
             y=alt.Y("score:Q", axis=alt.Axis(title="Score"), scale=alt.Scale(domain=[0, 1])),
-            color=alt.Color("metric:N", title="Metric"),
-            xOffset="metric:N",
+            color=alt.Color("metric_label:N", title=metric_title),
+            xOffset="metric_label:N",
             tooltip=[
-                alt.Tooltip("model_name:N", title="Model"),
-                alt.Tooltip("metric:N", title="Metric"),
-                alt.Tooltip("score:Q", title="Score", format=".3f"),
+                alt.Tooltip("model_name:N", title=model_title),
+                alt.Tooltip("metric_label:N", title=metric_title),
+                alt.Tooltip("score:Q", title=score_title, format=".3f"),
             ],
         )
         .properties(height=360)
@@ -2455,22 +2606,22 @@ def render_model_comparison(metrics: dict[str, Any]) -> None:
         use_container_width=True,
         hide_index=True,
         column_config={
-            "model_name": "Model",
-            "accuracy": st.column_config.ProgressColumn("Accuracy", format="%.3f", min_value=0, max_value=1),
-            "balanced_accuracy": st.column_config.ProgressColumn("Balanced Accuracy", format="%.3f", min_value=0, max_value=1),
-            "precision": st.column_config.ProgressColumn("Precision", format="%.3f", min_value=0, max_value=1),
-            "recall": st.column_config.ProgressColumn("Recall", format="%.3f", min_value=0, max_value=1),
-            "f1": st.column_config.ProgressColumn("F1", format="%.3f", min_value=0, max_value=1),
-            "roc_auc": st.column_config.ProgressColumn("ROC AUC", format="%.3f", min_value=0, max_value=1),
-            "recommended_threshold": st.column_config.NumberColumn("Recommended Threshold", format="%.2f"),
+            "model_name": model_title,
+            "accuracy": st.column_config.ProgressColumn(translate("accuracy"), format="%.3f", min_value=0, max_value=1),
+            "balanced_accuracy": st.column_config.ProgressColumn(translate("balanced_accuracy"), format="%.3f", min_value=0, max_value=1),
+            "precision": st.column_config.ProgressColumn(translate("precision"), format="%.3f", min_value=0, max_value=1),
+            "recall": st.column_config.ProgressColumn(translate("recall"), format="%.3f", min_value=0, max_value=1),
+            "f1": st.column_config.ProgressColumn(translate("f1_score"), format="%.3f", min_value=0, max_value=1),
+            "roc_auc": st.column_config.ProgressColumn(translate("roc_auc"), format="%.3f", min_value=0, max_value=1),
+            "recommended_threshold": st.column_config.NumberColumn(translate("recommended_threshold"), format="%.2f"),
             "positive_prediction_rate": st.column_config.ProgressColumn(
-                "Predicted Positive Rate",
+                translate("positive_prediction_rate"),
                 format="%.3f",
                 min_value=0,
                 max_value=1,
             ),
-            "average_precision": st.column_config.ProgressColumn("Avg Precision", format="%.3f", min_value=0, max_value=1),
-            "brier_score": st.column_config.NumberColumn("Brier", format="%.3f"),
+            "average_precision": st.column_config.ProgressColumn(translate("average_precision"), format="%.3f", min_value=0, max_value=1),
+            "brier_score": st.column_config.NumberColumn(translate("brier_score"), format="%.3f"),
         },
     )
 
@@ -2538,8 +2689,16 @@ def render_model_performance(metrics: dict[str, Any], feature_importance: pd.Dat
 
         confusion_frame = pd.DataFrame(
             confusion_matrix,
-            index=["Actual No Reorder", "Actual Reorder"],
-            columns=["Predicted No Reorder", "Predicted Reorder"],
+            index=(
+                ["Actual No Reorder", "Actual Reorder"]
+                if get_language() == "en"
+                else ["Reel sans recommande", "Reel avec recommande"]
+            ),
+            columns=(
+                ["Predicted No Reorder", "Predicted Reorder"]
+                if get_language() == "en"
+                else ["Predit sans recommande", "Predit avec recommande"]
+            ),
         )
         with st.expander(translate("confusion_matrix")):
             st.dataframe(confusion_frame, use_container_width=True)
@@ -2593,10 +2752,11 @@ def render_model_performance(metrics: dict[str, Any], feature_importance: pd.Dat
             use_container_width=True,
             hide_index=True,
             column_config={
-                "precision": st.column_config.ProgressColumn("Precision", format="%.3f", min_value=0, max_value=1),
-                "recall": st.column_config.ProgressColumn("Recall", format="%.3f", min_value=0, max_value=1),
+                "class": "Class" if get_language() == "en" else "Classe",
+                "precision": st.column_config.ProgressColumn(translate("precision"), format="%.3f", min_value=0, max_value=1),
+                "recall": st.column_config.ProgressColumn(translate("recall"), format="%.3f", min_value=0, max_value=1),
                 "f1_score": st.column_config.ProgressColumn("F1", format="%.3f", min_value=0, max_value=1),
-                "support": st.column_config.NumberColumn("Support", format="%d"),
+                "support": st.column_config.NumberColumn("Support" if get_language() == "en" else "Volume", format="%d"),
             },
         )
 
@@ -2611,14 +2771,29 @@ def render_model_performance(metrics: dict[str, Any], feature_importance: pd.Dat
     if not feature_importance.empty:
         st.subheader(translate("feature_importance"))
         st.caption(translate("feature_importance_help"))
-        chart_data = feature_importance[["feature", "importance"]]
-        render_bar_chart(chart_data, "feature", "importance", y_title="Importance", x_tick_angle=-15, height=390)
+        chart_data = feature_importance[["feature", "importance"]].copy()
+        chart_data["feature_label"] = chart_data["feature"].map(format_feature_label)
+        render_bar_chart(
+            chart_data,
+            "feature_label",
+            "importance",
+            y_title="Importance",
+            x_tick_angle=-15,
+            height=390,
+        )
+        table_data = chart_data.rename(
+            columns={
+                "feature_label": "feature_display",
+                "feature": "technical_feature",
+            }
+        )
         st.dataframe(
-            feature_importance,
+            table_data[["feature_display", "technical_feature", "importance"]],
             use_container_width=True,
             hide_index=True,
             column_config={
-                "feature": "Feature",
+                "feature_display": "Feature" if get_language() == "en" else "Feature affichee",
+                "technical_feature": "Technical name" if get_language() == "en" else "Nom technique",
                 "importance": st.column_config.ProgressColumn(
                     "Importance",
                     format="%.3f",

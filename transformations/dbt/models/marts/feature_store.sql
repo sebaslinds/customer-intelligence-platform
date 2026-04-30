@@ -33,7 +33,10 @@ order_products as (
 ),
 
 products as (
-    select product_id
+    select
+        product_id,
+        lower(coalesce(department, 'unknown')) as department,
+        lower(coalesce(aisle, 'unknown')) as aisle
     from {{ ref('dim_products') }}
 ),
 
@@ -80,7 +83,25 @@ user_order_features as (
 user_product_features as (
     select
         orders.user_id,
-        count(distinct products.product_id) as unique_products
+        count(distinct products.product_id) as unique_products,
+        count(distinct products.department) as unique_departments,
+        count(distinct products.aisle) as unique_aisles,
+        coalesce(
+            count_if(products.department = 'produce') / nullif(count(*), 0),
+            0
+        ) as produce_item_ratio,
+        coalesce(
+            count_if(products.department = 'dairy eggs') / nullif(count(*), 0),
+            0
+        ) as dairy_eggs_item_ratio,
+        coalesce(
+            count_if(products.aisle = 'fresh fruits') / nullif(count(*), 0),
+            0
+        ) as fresh_fruits_item_ratio,
+        coalesce(
+            count_if(products.aisle = 'fresh vegetables') / nullif(count(*), 0),
+            0
+        ) as fresh_vegetables_item_ratio
     from orders
     inner join order_products
         on orders.order_id = order_products.order_id
@@ -99,6 +120,12 @@ final as (
         user_order_features.reorder_ratio,
         user_order_features.reorder_order_ratio,
         coalesce(user_product_features.unique_products, 0) as unique_products,
+        coalesce(user_product_features.unique_departments, 0) as unique_departments,
+        coalesce(user_product_features.unique_aisles, 0) as unique_aisles,
+        coalesce(user_product_features.produce_item_ratio, 0) as produce_item_ratio,
+        coalesce(user_product_features.dairy_eggs_item_ratio, 0) as dairy_eggs_item_ratio,
+        coalesce(user_product_features.fresh_fruits_item_ratio, 0) as fresh_fruits_item_ratio,
+        coalesce(user_product_features.fresh_vegetables_item_ratio, 0) as fresh_vegetables_item_ratio,
         user_order_features.days_between_orders,
         user_order_features.stddev_days_between_orders,
         user_order_features.customer_tenure_days,

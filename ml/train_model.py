@@ -103,19 +103,19 @@ def build_training_matrix(
 ) -> tuple[pd.DataFrame, pd.Series]:
     validate_training_data(frame, target_column)
 
-    feature_columns = [column for column in FEATURE_COLUMNS if column in frame.columns]
-    if not feature_columns:
+    available_feature_columns = [column for column in FEATURE_COLUMNS if column in frame.columns]
+    if not available_feature_columns:
         raise ValueError("No numeric feature columns found for model training.")
 
     non_numeric_columns = [
-        column for column in feature_columns if not pd.api.types.is_numeric_dtype(frame[column])
+        column for column in available_feature_columns if not pd.api.types.is_numeric_dtype(frame[column])
     ]
     if non_numeric_columns:
         raise ValueError(f"Feature columns must be numeric: {', '.join(non_numeric_columns)}")
 
-    features = frame[feature_columns].fillna(0)
+    features = frame.reindex(columns=FEATURE_COLUMNS, fill_value=0).fillna(0)
     target = frame[target_column].astype(int)
-    logger.info("Training with feature columns: %s", ", ".join(feature_columns))
+    logger.info("Training with feature columns: %s", ", ".join(FEATURE_COLUMNS))
     return features, target
 
 

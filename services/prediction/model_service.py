@@ -6,17 +6,12 @@ import joblib
 import pandas as pd
 from fastapi import HTTPException, status
 
+from ml.features import FEATURE_COLUMNS
 from schemas.prediction import PredictionRequest
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_FEATURE_COLUMNS = [
-    "total_orders",
-    "avg_basket_size",
-    "reorder_ratio",
-    "unique_products",
-    "days_between_orders",
-]
+DEFAULT_FEATURE_COLUMNS = FEATURE_COLUMNS
 
 model_state: dict[str, Any] = {"model": None, "feature_columns": DEFAULT_FEATURE_COLUMNS}
 

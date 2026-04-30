@@ -80,6 +80,30 @@ models:
         description: Count of distinct products ordered by the user.
         tests:
           - not_null
+      - name: unique_departments
+        description: Count of distinct product departments represented in the user's observed baskets.
+        tests:
+          - not_null
+      - name: unique_aisles
+        description: Count of distinct product aisles represented in the user's observed baskets.
+        tests:
+          - not_null
+      - name: produce_item_ratio
+        description: Share of observed basket items from the produce department.
+        tests:
+          - not_null
+      - name: dairy_eggs_item_ratio
+        description: Share of observed basket items from the dairy eggs department.
+        tests:
+          - not_null
+      - name: fresh_fruits_item_ratio
+        description: Share of observed basket items from the fresh fruits aisle.
+        tests:
+          - not_null
+      - name: fresh_vegetables_item_ratio
+        description: Share of observed basket items from the fresh vegetables aisle.
+        tests:
+          - not_null
       - name: days_between_orders
         description: Average number of days between user orders.
       - name: stddev_days_between_orders
