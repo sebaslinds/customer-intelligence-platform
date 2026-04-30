@@ -3597,60 +3597,56 @@ def main() -> None:
         st.caption(str(exc))
         kpis = {"total_orders": 0, "revenue_proxy": 0, "reorder_rate": 0}
 
-    model_metrics = load_model_metrics()
-    feature_importance = load_feature_importance()
-    model_history = load_model_history()
-    model_drift_report = load_model_drift_report()
-
     render_kpis(kpis)
     st.divider()
 
-    (
-        overview_tab,
-        customer_tab,
-        product_tab,
-        quality_tab,
-        health_tab,
-        model_tab,
-        decision_tab,
-        copilot_tab,
-    ) = st.tabs(
-        [
-            translate("project_overview"),
-            translate("customer_insights"),
-            translate("product_trends"),
-            translate("data_quality"),
-            translate("pipeline_health"),
-            translate("model_performance"),
-            translate("decision_engine"),
-            translate("ai_copilot"),
-        ]
+    section_options = [
+        translate("project_overview"),
+        translate("customer_insights"),
+        translate("product_trends"),
+        translate("data_quality"),
+        translate("pipeline_health"),
+        translate("model_performance"),
+        translate("decision_engine"),
+        translate("ai_copilot"),
+    ]
+    selected_section = st.radio(
+        "Dashboard section",
+        section_options,
+        horizontal=True,
+        label_visibility="collapsed",
+        key=f"dashboard_section_{get_language()}",
     )
-    with overview_tab:
+
+    if selected_section == translate("project_overview"):
         render_project_overview()
-    with customer_tab:
+    elif selected_section == translate("customer_insights"):
         try:
             render_customer_insights(load_customer_insights())
         except Exception as exc:
             logger.exception("Failed to load customer insights")
             st.error("Unable to load customer insights from Snowflake.")
             st.caption(str(exc))
-    with product_tab:
+    elif selected_section == translate("product_trends"):
         try:
             render_product_trends(load_product_trends())
         except Exception as exc:
             logger.exception("Failed to load product trends")
             st.error("Unable to load product trends from Snowflake.")
             st.caption(str(exc))
-    with quality_tab:
+    elif selected_section == translate("data_quality"):
         render_data_quality()
-    with health_tab:
+    elif selected_section == translate("pipeline_health"):
         render_pipeline_health()
-    with model_tab:
+    elif selected_section == translate("model_performance"):
+        model_metrics = load_model_metrics()
+        feature_importance = load_feature_importance()
+        model_history = load_model_history()
+        model_drift_report = load_model_drift_report()
         render_model_performance(model_metrics, feature_importance, model_history, model_drift_report)
-    with decision_tab:
+    elif selected_section == translate("decision_engine"):
         render_decision_engine(kpis)
-    with copilot_tab:
+    elif selected_section == translate("ai_copilot"):
         render_ai_copilot()
 
 
