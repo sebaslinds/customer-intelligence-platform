@@ -27,6 +27,8 @@ logger = logging.getLogger(__name__)
 
 MODEL_METRICS_PATH = PROJECT_ROOT / "ml" / "artifacts" / "training_metrics.json"
 FEATURE_IMPORTANCE_PATH = PROJECT_ROOT / "ml" / "artifacts" / "feature_importance.csv"
+MODEL_HISTORY_PATH = PROJECT_ROOT / "ml" / "artifacts" / "model_evaluation_history.csv"
+MODEL_DRIFT_PATH = PROJECT_ROOT / "ml" / "artifacts" / "model_drift_report.json"
 COPILOT_TIMEOUT_SECONDS = 60
 API_HEALTH_TIMEOUT_SECONDS = 45
 DECISION_TIMEOUT_SECONDS = 45
@@ -250,6 +252,26 @@ TRANSLATIONS = {
             "Models are compared on the same train/test split. ROC AUC is used for selection, then F1, "
             "precision, recall, and calibration are reviewed for business tradeoffs."
         ),
+        "model_monitoring": "Model Monitoring",
+        "model_monitoring_help": "Tracks model quality across training runs and flags metric or feature drift.",
+        "evaluation_history": "Evaluation History",
+        "drift_status": "Drift Status",
+        "drift_summary": "Drift Summary",
+        "drift_findings": "Drift Findings",
+        "no_model_history": "No model evaluation history has been saved yet. Run the training pipeline to create it.",
+        "no_drift_report": "No drift report is available yet.",
+        "monitoring_runs": "Training Runs",
+        "last_training_run": "Last Training Run",
+        "tracked_metric": "Signal",
+        "previous_value": "Previous",
+        "current_value": "Current",
+        "metric_delta": "Delta",
+        "severity": "Severity",
+        "baseline": "Baseline",
+        "stable": "Stable",
+        "attention": "Attention",
+        "top_feature": "Top Feature",
+        "top_feature_importance": "Top Feature Weight",
         "ml_glossary": "ML Metrics Glossary",
         "ml_glossary_caption": "Plain-English definitions for the model metrics shown in this tab.",
         "glossary_term": "Term",
@@ -576,6 +598,26 @@ TRANSLATIONS = {
             "Les modeles sont compares sur le meme split train/test. ROC AUC sert a choisir le modele, puis F1, "
             "precision, recall et calibration sont analyses pour les compromis business."
         ),
+        "model_monitoring": "Suivi du modele",
+        "model_monitoring_help": "Suit la qualite du modele entre les entrainements et signale le drift des metriques ou des features.",
+        "evaluation_history": "Historique des evaluations",
+        "drift_status": "Statut du drift",
+        "drift_summary": "Resume du drift",
+        "drift_findings": "Signaux de drift",
+        "no_model_history": "Aucun historique d'evaluation n'est encore disponible. Lance le pipeline d'entrainement pour le creer.",
+        "no_drift_report": "Aucun rapport de drift n'est encore disponible.",
+        "monitoring_runs": "Entrainements",
+        "last_training_run": "Dernier entrainement",
+        "tracked_metric": "Signal",
+        "previous_value": "Avant",
+        "current_value": "Actuel",
+        "metric_delta": "Ecart",
+        "severity": "Severite",
+        "baseline": "Reference",
+        "stable": "Stable",
+        "attention": "Attention",
+        "top_feature": "Feature principale",
+        "top_feature_importance": "Poids de la feature principale",
         "ml_glossary": "Glossaire des metriques ML",
         "ml_glossary_caption": "Definitions simples des metriques affichees dans cet onglet.",
         "glossary_term": "Terme",
@@ -1165,6 +1207,26 @@ def load_feature_importance() -> pd.DataFrame:
         return pd.DataFrame(columns=["feature", "importance"])
 
     return pd.read_csv(FEATURE_IMPORTANCE_PATH)
+
+
+@st.cache_data(show_spinner=False)
+def load_model_history() -> pd.DataFrame:
+    if not MODEL_HISTORY_PATH.exists():
+        return pd.DataFrame()
+
+    history = pd.read_csv(MODEL_HISTORY_PATH)
+    if "run_timestamp" in history.columns:
+        history = history.sort_values("run_timestamp").reset_index(drop=True)
+    return history
+
+
+@st.cache_data(show_spinner=False)
+def load_model_drift_report() -> dict[str, Any]:
+    if not MODEL_DRIFT_PATH.exists():
+        return {}
+
+    with MODEL_DRIFT_PATH.open("r", encoding="utf-8") as file:
+        return json.load(file)
 
 
 def request_copilot_insights(question: str) -> dict[str, Any]:
@@ -2861,7 +2923,194 @@ def render_feature_driver_cards(feature_importance: pd.DataFrame) -> None:
     st.caption(explanation)
 
 
-def render_model_performance(metrics: dict[str, Any], feature_importance: pd.DataFrame) -> None:
+def format_monitoring_metric(metric_name: str) -> str:
+    labels = {
+        "accuracy": translate("accuracy"),
+        "balanced_accuracy": translate("balanced_accuracy"),
+        "precision": translate("precision"),
+        "recall": translate("recall"),
+        "f1": translate("f1_score"),
+        "roc_auc": translate("roc_auc"),
+        "average_precision": translate("average_precision"),
+        "brier_score": translate("brier_score"),
+        "positive_rate": translate("positive_rate"),
+    }
+    return labels.get(str(metric_name), format_feature_label(str(metric_name)))
+
+
+def format_drift_status(status: str) -> str:
+    status_key = str(status or "").lower()
+    if status_key in {"baseline", "stable", "attention"}:
+        return translate(status_key)
+    return status_key or "-"
+
+
+def format_history_timestamp(value: Any) -> str:
+    parsed = pd.to_datetime(value, errors="coerce")
+    if pd.isna(parsed):
+        return str(value or "")
+    return parsed.strftime("%Y-%m-%d %H:%M")
+
+
+def render_model_monitoring(model_history: pd.DataFrame, drift_report: dict[str, Any]) -> None:
+    st.subheader(translate("model_monitoring"))
+    st.caption(translate("model_monitoring_help"))
+
+    status = str(drift_report.get("status") or "").lower()
+    if not status:
+        status = "baseline" if len(model_history) <= 1 and not model_history.empty else "unknown"
+
+    latest_row = model_history.iloc[-1].to_dict() if not model_history.empty else {}
+    top_feature = drift_report.get("top_feature") or latest_row.get("top_feature")
+    top_importance = drift_report.get("top_feature_importance", latest_row.get("top_feature_importance"))
+
+    runs, drift_status, top_signal, signal_strength = st.columns(4)
+    runs.metric(translate("monitoring_runs"), format_number(len(model_history)))
+    drift_status.metric(translate("drift_status"), format_drift_status(status))
+    top_signal.metric(translate("top_feature"), format_feature_label(str(top_feature)) if top_feature else "-")
+    signal_strength.metric(
+        translate("top_feature_importance"),
+        format_static_metric(top_importance, decimals=3) if top_importance is not None else "-",
+    )
+
+    if drift_report:
+        with st.container(border=True):
+            st.caption(translate("drift_summary"))
+            st.write(drift_report.get("summary") or translate("no_drift_report"))
+
+            findings = drift_report.get("findings") or []
+            if findings:
+                st.markdown(f"**{translate('drift_findings')}**")
+                findings_frame = pd.DataFrame(findings)
+                rename_map = {
+                    "metric": translate("tracked_metric"),
+                    "previous_value": translate("previous_value"),
+                    "current_value": translate("current_value"),
+                    "delta": translate("metric_delta"),
+                    "severity": translate("severity"),
+                    "description": "Detail",
+                    "previous_top_feature": "Previous top feature",
+                    "current_top_feature": "Current top feature",
+                }
+                findings_frame = findings_frame.rename(columns=rename_map)
+                preferred_columns = [
+                    column
+                    for column in [
+                        translate("tracked_metric"),
+                        translate("previous_value"),
+                        translate("current_value"),
+                        translate("metric_delta"),
+                        translate("severity"),
+                        "Previous top feature",
+                        "Current top feature",
+                        "Detail",
+                    ]
+                    if column in findings_frame.columns
+                ]
+                render_static_table(findings_frame[preferred_columns])
+    else:
+        st.info(translate("no_drift_report"))
+
+    if model_history.empty:
+        st.info(translate("no_model_history"))
+        return
+
+    history = model_history.copy()
+    if "run_timestamp" in history.columns:
+        history["run_timestamp"] = pd.to_datetime(history["run_timestamp"], errors="coerce")
+
+    metric_columns = ["roc_auc", "f1", "balanced_accuracy", "precision", "recall"]
+    available_metrics = [column for column in metric_columns if column in history.columns]
+    for column in available_metrics:
+        history[column] = pd.to_numeric(history[column], errors="coerce")
+
+    if available_metrics and "run_timestamp" in history.columns:
+        chart_frame = history.tail(12)[["run_timestamp", *available_metrics]].melt(
+            id_vars="run_timestamp",
+            var_name="metric",
+            value_name="value",
+        )
+        chart_frame = chart_frame.dropna(subset=["run_timestamp", "value"])
+        chart_frame["metric_label"] = chart_frame["metric"].map(format_monitoring_metric)
+        if not chart_frame.empty:
+            chart = (
+                alt.Chart(chart_frame)
+                .mark_line(point=True)
+                .encode(
+                    x=alt.X("run_timestamp:T", title=translate("last_training_run")),
+                    y=alt.Y("value:Q", title="Score", scale=alt.Scale(zero=False)),
+                    color=alt.Color("metric_label:N", title=translate("tracked_metric")),
+                    tooltip=[
+                        alt.Tooltip("run_timestamp:T", title=translate("last_training_run")),
+                        alt.Tooltip("metric_label:N", title=translate("tracked_metric")),
+                        alt.Tooltip("value:Q", title="Score", format=".3f"),
+                    ],
+                )
+                .properties(height=280)
+            )
+            st.altair_chart(chart, use_container_width=True)
+
+    with st.expander(translate("evaluation_history"), expanded=False):
+        display_history = history.tail(12).copy()
+        if "run_timestamp" in display_history.columns:
+            display_history["run_timestamp"] = display_history["run_timestamp"].map(format_history_timestamp)
+
+        visible_columns = [
+            column
+            for column in [
+                "run_timestamp",
+                "selected_model",
+                "roc_auc",
+                "f1",
+                "balanced_accuracy",
+                "precision",
+                "recall",
+                "brier_score",
+                "top_feature",
+                "top_feature_importance",
+            ]
+            if column in display_history.columns
+        ]
+        display_history = display_history[visible_columns].rename(
+            columns={
+                "run_timestamp": translate("last_training_run"),
+                "selected_model": "Model" if get_language() == "en" else "Modele",
+                "roc_auc": translate("roc_auc"),
+                "f1": translate("f1_score"),
+                "balanced_accuracy": translate("balanced_accuracy"),
+                "precision": translate("precision"),
+                "recall": translate("recall"),
+                "brier_score": translate("brier_score"),
+                "top_feature": translate("top_feature"),
+                "top_feature_importance": translate("top_feature_importance"),
+            }
+        )
+
+        for column in [
+            translate("roc_auc"),
+            translate("f1_score"),
+            translate("balanced_accuracy"),
+            translate("precision"),
+            translate("recall"),
+            translate("brier_score"),
+            translate("top_feature_importance"),
+        ]:
+            if column in display_history.columns:
+                display_history[column] = display_history[column].map(format_static_metric)
+        if translate("top_feature") in display_history.columns:
+            display_history[translate("top_feature")] = display_history[translate("top_feature")].map(
+                lambda value: format_feature_label(str(value)) if pd.notna(value) else "-"
+            )
+
+        render_static_table(display_history)
+
+
+def render_model_performance(
+    metrics: dict[str, Any],
+    feature_importance: pd.DataFrame,
+    model_history: pd.DataFrame,
+    model_drift_report: dict[str, Any],
+) -> None:
     st.subheader(translate("model_performance"))
     if not metrics:
         st.info(translate("no_model_metrics"))
@@ -2871,6 +3120,7 @@ def render_model_performance(metrics: dict[str, Any], feature_importance: pd.Dat
     render_model_summary_cards(metrics, feature_importance)
     render_metric_gap_explanation(metrics)
     render_model_comparison(metrics)
+    render_model_monitoring(model_history, model_drift_report)
 
     accuracy, balanced_accuracy, precision, recall, f1_score, roc_auc = st.columns(6)
     accuracy.metric(translate("accuracy"), format_percent(metrics.get("accuracy", 0)))
@@ -3349,6 +3599,8 @@ def main() -> None:
 
     model_metrics = load_model_metrics()
     feature_importance = load_feature_importance()
+    model_history = load_model_history()
+    model_drift_report = load_model_drift_report()
 
     render_kpis(kpis)
     st.divider()
@@ -3395,7 +3647,7 @@ def main() -> None:
     with health_tab:
         render_pipeline_health()
     with model_tab:
-        render_model_performance(model_metrics, feature_importance)
+        render_model_performance(model_metrics, feature_importance, model_history, model_drift_report)
     with decision_tab:
         render_decision_engine(kpis)
     with copilot_tab:

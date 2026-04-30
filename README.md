@@ -168,6 +168,8 @@ Current model artifacts:
 - `ml/artifacts/random_forest_reorder_model.joblib`
 - `ml/artifacts/training_metrics.json`
 - `ml/artifacts/feature_importance.csv`
+- `ml/artifacts/model_evaluation_history.csv`
+- `ml/artifacts/model_drift_report.json`
 
 Current selected model:
 
@@ -190,7 +192,7 @@ Positive Rate: 93.4%
 Recommended Threshold: 0.95
 ```
 
-The dashboard includes model performance metrics, model comparison, feature importance, a confusion matrix, a metric glossary, and business recommendations. Because the dataset is highly imbalanced toward reorder-positive examples, balanced accuracy, ROC AUC, precision, recall, and threshold analysis are more useful than accuracy alone.
+The dashboard includes model performance metrics, model comparison, feature importance, a confusion matrix, a metric glossary, model evaluation history, drift status, and business recommendations. Because the dataset is highly imbalanced toward reorder-positive examples, balanced accuracy, ROC AUC, precision, recall, threshold analysis, and monitoring history are more useful than accuracy alone.
 
 ## API
 

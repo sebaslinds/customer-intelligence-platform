@@ -77,6 +77,22 @@ The filename is kept for API compatibility, even though the training metadata id
 
 The dataset is highly imbalanced toward reorder-positive examples. For this reason, accuracy alone is not a good quality measure. Balanced accuracy, ROC AUC, precision, recall, and threshold behavior are more informative.
 
+## Monitoring
+
+Each training run now writes a model monitoring record to:
+
+```text
+ml/artifacts/model_evaluation_history.csv
+```
+
+The record captures selected model, quality metrics, train/test row counts, positive class rate, recommended threshold, and the top feature signal. The training pipeline also writes a drift report to:
+
+```text
+ml/artifacts/model_drift_report.json
+```
+
+The drift report compares the latest run with the previous run and flags metric drops or major top-feature shifts. These artifacts are displayed in the Streamlit model performance tab so reviewers can see whether the model is improving, stable, or needs attention.
+
 ## Model Comparison
 
 | Model | Accuracy | Balanced Accuracy | Precision | Recall | F1 | ROC AUC | Threshold |
@@ -110,7 +126,6 @@ This is useful for campaigns where false positives are costly. If the business g
 
 - Add richer customer features such as recency bands, reorder streaks, and category preferences.
 - Add product and department affinity features once basket item coverage is improved.
-- Track model drift and feature drift over time.
 - Add SHAP or permutation importance for more transparent explanations.
-- Store model versions and metrics in a model registry.
+- Store model versions, evaluation history, and drift reports in Snowflake, S3, or a model registry.
 - Tune thresholds by campaign objective: retention, replenishment, win-back, or product discovery.

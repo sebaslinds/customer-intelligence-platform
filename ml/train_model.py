@@ -30,12 +30,15 @@ from config.logging_config import configure_logging
 from config.settings import get_settings
 from ingestion.snowflake_client import build_snowflake_engine
 from ml.features import FEATURE_COLUMNS, TARGET_COLUMN, build_reorder_training_query
+from ml.model_monitoring import save_monitoring_artifacts
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL_PATH = Path("ml/artifacts/random_forest_reorder_model.joblib")
 DEFAULT_METRICS_PATH = Path("ml/artifacts/training_metrics.json")
 DEFAULT_FEATURE_IMPORTANCE_PATH = Path("ml/artifacts/feature_importance.csv")
+DEFAULT_MODEL_HISTORY_PATH = Path("ml/artifacts/model_evaluation_history.csv")
+DEFAULT_MODEL_DRIFT_PATH = Path("ml/artifacts/model_drift_report.json")
 DEFAULT_SOURCE_RELATION = "fct_orders"
 MAX_CURVE_POINTS = 200
 MODEL_SELECTION_METRIC = "roc_auc"
@@ -510,6 +513,18 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_FEATURE_IMPORTANCE_PATH,
         help="Output path for feature importance CSV.",
     )
+    parser.add_argument(
+        "--model-history-path",
+        type=Path,
+        default=DEFAULT_MODEL_HISTORY_PATH,
+        help="Output path for historical model evaluation CSV.",
+    )
+    parser.add_argument(
+        "--model-drift-path",
+        type=Path,
+        default=DEFAULT_MODEL_DRIFT_PATH,
+        help="Output path for model drift report JSON.",
+    )
     parser.add_argument("--test-size", type=float, default=0.2, help="Test split size.")
     parser.add_argument("--random-state", type=int, default=42, help="Random seed.")
     return parser.parse_args()
@@ -539,6 +554,7 @@ def main() -> None:
     )
     save_model(model, args.model_path)
     save_training_artifacts(metrics, feature_importance, args.metrics_path, args.feature_importance_path)
+    save_monitoring_artifacts(metrics, feature_importance, args.model_history_path, args.model_drift_path)
 
     logger.info("Model accuracy: %.4f", metrics["accuracy"])
     logger.info("Model precision: %.4f", metrics["precision"])
