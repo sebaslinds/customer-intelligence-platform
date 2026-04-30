@@ -2274,7 +2274,7 @@
       "recommended_threshold": 0.6,
       "positive_prediction_rate": 0.5990778141909915,
       "average_precision": 0.9723239746949462,
-      "brier_score": 0.159250353674008
+      "brier_score": 0.15925035367400797
     },
     {
       "model_name": "logistic_regression",
