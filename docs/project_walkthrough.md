@@ -97,7 +97,7 @@ The feature store is saved in Snowflake so the same feature definitions can supp
 
 ## 7. Machine Learning
 
-The ML pipeline trains a RandomForest classifier to predict customer reorder behavior.
+The ML pipeline predicts whether a future order is likely to contain reordered items. It now compares multiple candidate models instead of treating one model as automatically correct.
 
 Main file:
 
@@ -108,11 +108,11 @@ ml/train_model.py
 The training pipeline:
 
 1. Loads the feature store from Snowflake.
-2. Builds a classification dataset.
+2. Builds a time-aware classification dataset to reduce leakage.
 3. Splits training and test data.
-4. Trains a scikit-learn RandomForest model.
-5. Evaluates accuracy, precision, recall, F1, ROC AUC, and confusion matrix.
-6. Saves the model artifact and metrics locally.
+4. Benchmarks Gradient Boosting, Random Forest, and Logistic Regression.
+5. Evaluates accuracy, balanced accuracy, precision, recall, F1, ROC AUC, average precision, Brier score, threshold behavior, and confusion matrix.
+6. Saves the selected model artifact, feature importance, benchmark comparison, and metrics locally.
 
 Artifacts:
 
@@ -140,7 +140,9 @@ Endpoints:
 
 The prediction endpoint loads the trained model artifact and returns a reorder probability for user feature inputs.
 
-The copilot endpoint collects Snowflake metric context, sends it to OpenAI, and returns structured insights. If OpenAI is unavailable, a local metric-based fallback response is returned.
+The copilot endpoint collects Snowflake metric context, sends it to the configured AI provider, and returns structured insights. If the provider is unavailable, a local metric-based fallback response is returned.
+
+The Decision Engine endpoint transforms anomaly and operational signals into prioritized alerts, recommendations, and explanations. It can use Gemini for narrative explanations when configured, with deterministic fallback text for reliability.
 
 ## 9. Dashboard
 

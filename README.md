@@ -2,7 +2,7 @@
 
 An end-to-end data engineering, machine learning, and AI analytics platform built on Instacart-style customer order data.
 
-The platform ingests raw CSV files, models them in Snowflake with dbt, builds customer-level features, trains a reorder prediction model, serves predictions with FastAPI, visualizes insights in Streamlit, and generates business recommendations with an OpenAI-powered copilot. The dashboard is deployed publicly, supports English/French language switching, and includes interactive business charts and AI insight cards.
+The platform ingests raw CSV files, models them in Snowflake with dbt, builds customer-level features, trains and compares reorder prediction models, serves predictions with FastAPI, visualizes insights in Streamlit, and generates business recommendations with AI-assisted explanations. The dashboard is deployed publicly, supports English/French language switching, and includes interactive business charts, ML diagnostics, a Decision Engine, and AI insight cards.
 
 ## Live Demo
 
@@ -32,12 +32,13 @@ This project demonstrates how a modern data stack can convert raw transaction da
 - Incremental fact model for order processing
 - Customer feature store for analytics and machine learning
 - Advanced analytics marts for retention, churn probability, and customer lifetime value
-- RandomForest classification model for reorder prediction
+- ML training pipeline that compares Gradient Boosting, Random Forest, and Logistic Regression
+- Reorder prediction model with model card, feature importance, confusion matrix, threshold guidance, and recommendations
 - FastAPI service with `/health`, `/predict`, and `/copilot/insights`
 - Decision Engine service with `/decision` for alerts and recommendations
 - Streamlit dashboard deployed on Streamlit Cloud
-- AI copilot powered by OpenAI and grounded in Snowflake metrics
-- Local fallback mode when OpenAI is unavailable
+- AI copilot powered by OpenAI/Gemini where configured and grounded in Snowflake metrics
+- Deterministic local fallback mode when an AI provider is unavailable
 - English/French dashboard toggle with localized quick prompts and chat UI
 - Interactive Altair charts with readable axis labels and tooltips
 - AI insight cards for impacted segments, recommendations, priority mix, and follow-up questions
@@ -68,22 +69,24 @@ dbt Mart Models
     +--> Feature Store
              |
              v
-        RandomForest Model Training
+        Model Training and Comparison
              |
              v
         FastAPI Prediction Service
              |
-             v
-        Streamlit Dashboard
+             +--> Streamlit Dashboard
              |
-             v
-        OpenAI Business Copilot
+             +--> Decision Engine
+             |
+             +--> AI Business Copilot
 ```
 
 Detailed documentation:
 
 - [Architecture](docs/architecture.md)
 - [Project Walkthrough](docs/project_walkthrough.md)
+- [Model Card](docs/model_card.md)
+- [Decision Engine](docs/decision_engine.md)
 
 ## Tech Stack
 
@@ -96,7 +99,7 @@ Detailed documentation:
 | Machine Learning | scikit-learn, joblib |
 | API | FastAPI, Pydantic, Uvicorn |
 | Dashboard | Streamlit, Altair |
-| AI | OpenAI API |
+| AI | OpenAI API, Gemini API, deterministic fallback |
 | Decision Intelligence | Rule engine, anomaly detection, Gemini explanations |
 | Data Quality | Great Expectations-inspired validation checks |
 | Orchestration | Apache Airflow DAG scaffold |
@@ -113,7 +116,7 @@ customer-intelligence-platform/
   dashboard/              Streamlit dashboard
   data/raw/               Local raw data landing area
   data_quality/           Snowflake data validation checks
-  docs/                   Architecture and project walkthrough
+  docs/                   Architecture, walkthrough, model card, and decision engine docs
   ingestion/              CSV ingestion and Snowflake loading
   ml/                     Feature engineering, training, and model artifacts
   orchestration/airflow/  Airflow DAG for pipeline orchestration
@@ -142,15 +145,23 @@ customer-intelligence-platform/
 
 ## Machine Learning
 
-The reorder model is trained on customer behavioral features from Snowflake.
+The reorder model is trained on time-aware customer behavioral features from Snowflake. Features are calculated from prior order history before the evaluated order to reduce direct target leakage.
 
-Feature examples:
+Feature groups:
 
-- `total_orders`
-- `avg_basket_size`
-- `reorder_ratio`
-- `unique_products`
-- `days_between_orders`
+- Order history: `total_orders`, `customer_tenure_days`, `order_frequency_30d`
+- Recency and gaps: `days_since_last_order`, `days_between_orders`, `stddev_days_between_orders`
+- Time behavior: `avg_order_dow`, `avg_order_hour_of_day`, `weekend_order_ratio`, `evening_order_ratio`
+- Basket coverage: `observed_basket_orders`, `avg_basket_size`
+- Product mix: `unique_products`, `unique_departments`, `unique_aisles`, `produce_item_ratio`, `fresh_fruits_item_ratio`, `fresh_vegetables_item_ratio`
+
+The training pipeline benchmarks:
+
+| Model | Accuracy | Balanced Accuracy | Precision | Recall | F1 | ROC AUC |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Gradient Boosting | 0.544 | 0.674 | 0.977 | 0.525 | 0.683 | 0.741 |
+| Random Forest | 0.630 | 0.677 | 0.971 | 0.622 | 0.758 | 0.729 |
+| Logistic Regression | 0.626 | 0.663 | 0.968 | 0.621 | 0.756 | 0.715 |
 
 Current model artifacts:
 
@@ -158,17 +169,28 @@ Current model artifacts:
 - `ml/artifacts/training_metrics.json`
 - `ml/artifacts/feature_importance.csv`
 
-Current validation metrics:
+Current selected model:
 
 ```text
-Accuracy: 0.615
-Precision: 0.963
-Recall: 0.612
-F1: 0.748
-ROC AUC: 0.682
+Gradient Boosting
 ```
 
-The dashboard includes model performance metrics, feature importance, and a confusion matrix.
+Current validation summary:
+
+```text
+Accuracy: 0.544
+Balanced Accuracy: 0.674
+Precision: 0.977
+Recall: 0.525
+F1: 0.683
+ROC AUC: 0.741
+Average Precision: 0.974
+Brier Score: 0.058
+Positive Rate: 93.4%
+Recommended Threshold: 0.95
+```
+
+The dashboard includes model performance metrics, model comparison, feature importance, a confusion matrix, a metric glossary, and business recommendations. Because the dataset is highly imbalanced toward reorder-positive examples, balanced accuracy, ROC AUC, precision, recall, and threshold analysis are more useful than accuracy alone.
 
 ## API
 
@@ -254,16 +276,20 @@ Example request:
     "reorder_rate": 0.22,
     "churn_rate": 0.61,
     "days_between_orders": 24,
-    "data_quality_failures": 0
+    "data_quality_failures": 0,
+    "api_health": "ok",
+    "revenue_proxy_delta": -0.12
   },
   "anomalies": [],
-  "use_gemini": true
+  "use_gemini": true,
+  "language": "en"
 }
 ```
 
 The decision engine:
 
 - detects anomalies from incoming metrics
+- separates manually simulated business inputs from live operational checks
 - applies business decision rules
 - assigns priority levels: `low`, `medium`, `high`, `critical`
 - returns alerts and recommendations
@@ -294,6 +320,7 @@ Recent dashboard improvements:
 - interactive Altair charts with horizontal or angled x-axis labels
 - health checks for Snowflake, Render API, model artifacts, and model metrics
 - decision scenario simulator for anomaly-driven alerts and recommendations
+- carbon footprint estimates for AI conversations and Decision Engine explanations
 
 The AI Copilot tab supports questions such as:
 
@@ -490,10 +517,12 @@ Workflow file:
 ## Limitations
 
 - Revenue is represented as a proxy because the Instacart dataset does not include product prices.
+- The Instacart order history has a cap of 100 observed orders per user, so top-user rankings are less informative than behavioral segmentation.
+- Product-level basket coverage is incomplete for many users, so aisle and department features should be interpreted cautiously.
 - The model uses historical behavioral features and should not be interpreted as real-time customer intent.
 - Airflow and Kafka are included as production-style scaffolding, not hosted services in the current deployment.
 - The model artifact is committed for portfolio deployment simplicity. A production system should use object storage or a model registry.
-- OpenAI responses are grounded in aggregate Snowflake metrics and do not have unrestricted SQL execution.
+- AI responses are grounded in aggregate Snowflake metrics and do not have unrestricted SQL execution.
 
 ## Future Improvements
 
@@ -501,6 +530,9 @@ Workflow file:
 - Add API authentication and rate limiting
 - Add historical model evaluation tracking
 - Add model drift monitoring
+- Add SHAP or permutation importance for clearer model explanations
+- Persist Decision Engine outputs to Snowflake for auditability
+- Add Slack or email alert routing from the Decision Engine
 - Add richer dashboard filters by cohort, product department, customer segment, and language-aware insight type
 - Add downloadable AI insight reports
 - Add screenshots or a short demo GIF to the README

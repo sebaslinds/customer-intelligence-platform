@@ -24,7 +24,7 @@ dbt Mart Models
     +--> Feature Store
              |
              v
-        RandomForest Model Training
+        Model Training and Comparison
              |
              v
         Model Artifact
@@ -32,11 +32,9 @@ dbt Mart Models
              v
         FastAPI Prediction Service
              |
-             v
-        Streamlit Dashboard
+             +--> Streamlit Dashboard
              |
-             v
-        OpenAI Business Copilot
+             +--> AI Copilot and Decision Engine
 ```
 
 ## Components
@@ -48,10 +46,10 @@ dbt Mart Models
 | Warehouse | Snowflake | Stores raw, staging, mart, feature, and analytics tables. |
 | Transformations | dbt | Builds staging views, dimensional models, fact tables, feature store, and advanced analytics marts. |
 | Data quality | Great Expectations-inspired validation | Checks key constraints before downstream transformations. |
-| Machine learning | scikit-learn RandomForest | Trains a reorder prediction model from customer behavioral features. |
-| API | FastAPI on Render | Serves health checks, prediction scoring, and AI copilot insights. |
-| Dashboard | Streamlit Cloud | Displays KPIs, product trends, customer insights, ML performance, and copilot responses. |
-| AI | OpenAI API | Generates structured business insights grounded in Snowflake metrics. |
+| Machine learning | scikit-learn model comparison | Compares Gradient Boosting, Random Forest, and Logistic Regression for reorder prediction. |
+| API | FastAPI on Render | Serves health checks, prediction scoring, decision engine outputs, and AI copilot insights. |
+| Dashboard | Streamlit Cloud | Displays KPIs, product trends, customer insights, data quality, pipeline health, ML performance, decisions, and copilot responses. |
+| AI | OpenAI API, Gemini API, local fallback | Generates structured business insights and decision explanations grounded in Snowflake metrics. |
 | CI/CD | GitHub Actions | Runs linting, tests, and dbt validation on code changes. |
 
 ## Data Flow
@@ -61,10 +59,10 @@ dbt Mart Models
 3. Raw records are loaded into Snowflake analytics tables.
 4. dbt creates clean staging models for orders, order products, and products.
 5. dbt marts create facts, dimensions, customer cohorts, churn probabilities, lifetime value, and a feature store.
-6. The ML training pipeline reads the feature store from Snowflake and writes model artifacts.
-7. FastAPI loads the trained model and exposes `/predict`.
+6. The ML training pipeline reads Snowflake features, compares candidate models, and writes model artifacts and evaluation metrics.
+7. FastAPI loads the selected model and exposes `/predict`, `/decision`, and `/copilot/insights`.
 8. Streamlit reads Snowflake marts and calls the deployed API.
-9. The AI copilot collects Snowflake context, sends it to OpenAI, and renders structured recommendations.
+9. The AI copilot and Decision Engine collect metric context, use configured LLM providers when available, and fall back to deterministic explanations when providers are unavailable.
 
 ## Snowflake Layers
 
@@ -86,7 +84,7 @@ GitHub
   |      |
   |      +--> FastAPI service
   |      +--> Model artifact
-  |      +--> Snowflake + OpenAI environment variables
+  |      +--> Snowflake + OpenAI/Gemini environment variables
   |
   +--> Streamlit Cloud
          |
