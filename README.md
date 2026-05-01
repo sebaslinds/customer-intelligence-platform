@@ -424,6 +424,8 @@ API_RATE_LIMIT_PER_MINUTE=60
 
 Set `API_AUTH_ENABLED=true` and provide `API_KEY` when you want to protect `/predict`,
 `/decision`, and `/copilot/insights`. The `/health` endpoint remains public for uptime checks.
+When API auth is enabled on Render, add the same `API_KEY` value to Streamlit Cloud secrets.
+The dashboard sends it as the `X-API-Key` header for protected API calls.
 
 ## Running Locally
 
@@ -501,6 +503,7 @@ Main file: dashboard/app.py
 Python version: 3.11
 Dependencies: requirements.txt
 API_BASE_URL: deployed Render API URL
+API_KEY: same value as Render API_KEY when API_AUTH_ENABLED=true
 ```
 
 ## CI/CD
@@ -526,6 +529,8 @@ Workflow file:
 - Keep raw data out of Git unless it is intentionally sampled and safe to share.
 - Protected API routes support `X-API-Key` authentication and per-client rate limiting.
 - Keep `/health` unauthenticated so Render, Streamlit, and monitoring tools can check service status.
+- Opening `/decision` directly in a browser sends a `GET` request and returns `Method Not Allowed` by design.
+  Use Swagger, curl, or the dashboard button to send a `POST` request with `X-API-Key`.
 
 ## Limitations
 

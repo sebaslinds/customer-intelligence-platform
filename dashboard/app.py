@@ -1229,11 +1229,31 @@ def load_model_drift_report() -> dict[str, Any]:
         return json.load(file)
 
 
+def read_streamlit_secret(name: str) -> str | None:
+    try:
+        value = st.secrets.get(name)
+    except Exception:
+        return None
+    if value is None:
+        return None
+    secret = str(value).strip()
+    return secret or None
+
+
+def build_api_headers() -> dict[str, str]:
+    headers = {"Accept": "application/json"}
+    api_key = settings.api_key or read_streamlit_secret("API_KEY") or read_streamlit_secret("api_key")
+    if api_key:
+        headers["X-API-Key"] = api_key
+    return headers
+
+
 def request_copilot_insights(question: str) -> dict[str, Any]:
     api_base_url = settings.api_base_url.rstrip("/")
     response = requests.post(
         f"{api_base_url}/copilot/insights",
         json={"question": question},
+        headers=build_api_headers(),
         timeout=COPILOT_TIMEOUT_SECONDS,
     )
     response.raise_for_status()
@@ -1245,6 +1265,7 @@ def request_decision_engine(payload: dict[str, Any]) -> dict[str, Any]:
     response = requests.post(
         f"{api_base_url}/decision",
         json=payload,
+        headers=build_api_headers(),
         timeout=DECISION_TIMEOUT_SECONDS,
     )
     response.raise_for_status()
