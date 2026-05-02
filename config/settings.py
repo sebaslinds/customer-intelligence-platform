@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     api_key: str | None = None
     api_auth_enabled: bool = False
     api_rate_limit_per_minute: int = 60
+    redis_url: str | None = None
+    redis_rate_limit_prefix: str = "customer-intelligence:rate-limit"
     model_path: str = "ml/artifacts/random_forest_reorder_model.joblib"
     openai_api_key: str | None = None
     openai_model: str = "gpt-4.1-mini"

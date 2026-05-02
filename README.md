@@ -420,12 +420,16 @@ API_BASE_URL=http://localhost:8000
 API_AUTH_ENABLED=false
 API_KEY=
 API_RATE_LIMIT_PER_MINUTE=60
+REDIS_URL=
+REDIS_RATE_LIMIT_PREFIX=customer-intelligence:rate-limit
 ```
 
 Set `API_AUTH_ENABLED=true` and provide `API_KEY` when you want to protect `/predict`,
 `/decision`, and `/copilot/insights`. The `/health` endpoint remains public for uptime checks.
 When API auth is enabled on Render, add the same `API_KEY` value to Streamlit Cloud secrets.
 The dashboard sends it as the `X-API-Key` header for protected API calls.
+Set `REDIS_URL` in production to share rate limit counters across API instances. When it is
+not configured, the API uses the local in-memory limiter for development and single-instance runs.
 
 ## Running Locally
 
@@ -492,6 +496,7 @@ MODEL_PATH=ml/artifacts/random_forest_reorder_model.joblib
 API_AUTH_ENABLED=true
 API_KEY
 API_RATE_LIMIT_PER_MINUTE=60
+REDIS_URL
 ```
 
 ### Streamlit Cloud
@@ -528,6 +533,7 @@ Workflow file:
 - Rotate Snowflake, OpenAI, and Kaggle credentials if they are exposed in screenshots, logs, or chat.
 - Keep raw data out of Git unless it is intentionally sampled and safe to share.
 - Protected API routes support `X-API-Key` authentication and per-client rate limiting.
+- `REDIS_URL` enables shared rate limiting across Render instances; without it, limits are in-memory per instance.
 - Keep `/health` unauthenticated so Render, Streamlit, and monitoring tools can check service status.
 - Opening `/decision` directly in a browser sends a `GET` request and returns `Method Not Allowed` by design.
   Use Swagger, curl, or the dashboard button to send a `POST` request with `X-API-Key`.
@@ -545,7 +551,7 @@ Workflow file:
 ## Future Improvements
 
 - Store model artifacts in Snowflake stage, S3, or a model registry
-- Move API rate limiting to Redis or another shared store for multi-instance deployments
+- Tune Redis-backed rate limit thresholds by endpoint and environment
 - Add historical model evaluation tracking
 - Add model drift monitoring
 - Add SHAP or permutation importance for clearer model explanations
