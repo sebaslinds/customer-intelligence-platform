@@ -12,6 +12,10 @@ services:
         value: INFO
       - key: MODEL_PATH
         value: ml/artifacts/random_forest_reorder_model.joblib
+      - key: MODEL_URI
+        sync: false
+      - key: MODEL_RUN_HISTORY_TABLE
+        value: CUSTOMER_INTELLIGENCE.ML_ARTIFACTS.MODEL_TRAINING_RUNS
       - key: OPENAI_MODEL
         value: gpt-4.1-mini
       - key: SNOWFLAKE_ACCOUNT

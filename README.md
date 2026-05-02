@@ -416,6 +416,9 @@ OPENAI_MODEL=gpt-4o-mini
 GEMINI_API_KEY=
 GEMINI_MODEL=gemini-1.5-flash
 MODEL_PATH=ml/artifacts/random_forest_reorder_model.joblib
+MODEL_URI=
+MODEL_CACHE_DIR=
+MODEL_RUN_HISTORY_TABLE=CUSTOMER_INTELLIGENCE.ML_ARTIFACTS.MODEL_TRAINING_RUNS
 API_BASE_URL=http://localhost:8000
 API_AUTH_ENABLED=false
 API_KEY=
@@ -430,6 +433,9 @@ When API auth is enabled on Render, add the same `API_KEY` value to Streamlit Cl
 The dashboard sends it as the `X-API-Key` header for protected API calls.
 Set `REDIS_URL` in production to share rate limit counters across API instances. When it is
 not configured, the API uses the local in-memory limiter for development and single-instance runs.
+Set `MODEL_URI` to a Snowflake stage file path when the API should download the model artifact
+at startup instead of reading the local `MODEL_PATH` file.
+The training pipeline writes every model run to `MODEL_RUN_HISTORY_TABLE` for production auditability.
 
 ## Running Locally
 
@@ -458,6 +464,14 @@ Train the model:
 
 ```bash
 python -m ml.train_model
+```
+
+Each run writes local artifacts and appends a Snowflake record to
+`CUSTOMER_INTELLIGENCE.ML_ARTIFACTS.MODEL_TRAINING_RUNS`. To run locally without writing the
+Snowflake history table, use:
+
+```bash
+python -m ml.train_model --skip-model-run-history
 ```
 
 Run the API:
@@ -493,10 +507,26 @@ SNOWFLAKE_SCHEMA
 OPENAI_API_KEY
 OPENAI_MODEL
 MODEL_PATH=ml/artifacts/random_forest_reorder_model.joblib
+MODEL_URI=@CUSTOMER_INTELLIGENCE.ML_ARTIFACTS.MODEL_STAGE/models/random_forest_reorder_model.joblib
 API_AUTH_ENABLED=true
 API_KEY
 API_RATE_LIMIT_PER_MINUTE=60
 REDIS_URL
+```
+
+When using `MODEL_URI`, grant the API role read access to the model stage:
+
+```sql
+GRANT USAGE ON DATABASE CUSTOMER_INTELLIGENCE TO ROLE TRANSFORMER;
+GRANT USAGE ON SCHEMA CUSTOMER_INTELLIGENCE.ML_ARTIFACTS TO ROLE TRANSFORMER;
+GRANT READ ON STAGE CUSTOMER_INTELLIGENCE.ML_ARTIFACTS.MODEL_STAGE TO ROLE TRANSFORMER;
+```
+
+When writing model run history from training, grant table privileges to the training role:
+
+```sql
+GRANT CREATE TABLE ON SCHEMA CUSTOMER_INTELLIGENCE.ML_ARTIFACTS TO ROLE TRANSFORMER;
+GRANT INSERT, SELECT ON FUTURE TABLES IN SCHEMA CUSTOMER_INTELLIGENCE.ML_ARTIFACTS TO ROLE TRANSFORMER;
 ```
 
 ### Streamlit Cloud
@@ -545,14 +575,15 @@ Workflow file:
 - Product-level basket coverage is incomplete for many users, so aisle and department features should be interpreted cautiously.
 - The model uses historical behavioral features and should not be interpreted as real-time customer intent.
 - Airflow and Kafka are included as production-style scaffolding, not hosted services in the current deployment.
-- The model artifact is committed for portfolio deployment simplicity. A production system should use object storage or a model registry.
+- The API can load the model artifact from a Snowflake stage with `MODEL_URI`; the committed artifact remains a local development fallback.
+- Training runs are persisted to `MODEL_RUN_HISTORY_TABLE` with metrics, drift findings, feature importance, and model comparison payloads.
 - AI responses are grounded in aggregate Snowflake metrics and do not have unrestricted SQL execution.
 
 ## Future Improvements
 
-- Store model artifacts in Snowflake stage, S3, or a model registry
+- Add model artifact versioning and promotion metadata
+- Surface Snowflake model run history directly in the dashboard
 - Tune Redis-backed rate limit thresholds by endpoint and environment
-- Add historical model evaluation tracking
 - Add model drift monitoring
 - Add SHAP or permutation importance for clearer model explanations
 - Persist Decision Engine outputs to Snowflake for auditability

@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     redis_url: str | None = None
     redis_rate_limit_prefix: str = "customer-intelligence:rate-limit"
     model_path: str = "ml/artifacts/random_forest_reorder_model.joblib"
+    model_uri: str | None = None
+    model_cache_dir: str | None = None
+    model_run_history_table: str = "CUSTOMER_INTELLIGENCE.ML_ARTIFACTS.MODEL_TRAINING_RUNS"
     openai_api_key: str | None = None
     openai_model: str = "gpt-4.1-mini"
     gemini_api_key: str | None = None

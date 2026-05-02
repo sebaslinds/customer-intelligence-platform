@@ -67,7 +67,7 @@ def build_evaluation_record(
         "selected_model": str(metrics.get("selected_model") or "unknown"),
         "train_rows": _to_int(metrics.get("train_rows")),
         "test_rows": _to_int(metrics.get("test_rows")),
-        "threshold": _to_float(metrics.get("threshold")),
+        "threshold": _to_float(metrics.get("threshold") or metrics.get("recommended_threshold")),
         "top_feature": top_feature,
         "top_feature_importance": top_feature_importance,
     }

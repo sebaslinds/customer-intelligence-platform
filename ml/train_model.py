@@ -31,6 +31,7 @@ from config.settings import get_settings
 from ingestion.snowflake_client import build_snowflake_engine
 from ml.features import FEATURE_COLUMNS, TARGET_COLUMN, build_reorder_training_query
 from ml.model_monitoring import save_monitoring_artifacts
+from ml.model_registry import save_model_run_to_snowflake
 
 logger = logging.getLogger(__name__)
 
@@ -525,6 +526,16 @@ def parse_args() -> argparse.Namespace:
         default=DEFAULT_MODEL_DRIFT_PATH,
         help="Output path for model drift report JSON.",
     )
+    parser.add_argument(
+        "--model-run-history-table",
+        default=None,
+        help="Snowflake table that stores historical model training runs.",
+    )
+    parser.add_argument(
+        "--skip-model-run-history",
+        action="store_true",
+        help="Skip writing model run history to Snowflake.",
+    )
     parser.add_argument("--test-size", type=float, default=0.2, help="Test split size.")
     parser.add_argument("--random-state", type=int, default=42, help="Random seed.")
     return parser.parse_args()
@@ -554,7 +565,19 @@ def main() -> None:
     )
     save_model(model, args.model_path)
     save_training_artifacts(metrics, feature_importance, args.metrics_path, args.feature_importance_path)
-    save_monitoring_artifacts(metrics, feature_importance, args.model_history_path, args.model_drift_path)
+    drift_report = save_monitoring_artifacts(metrics, feature_importance, args.model_history_path, args.model_drift_path)
+    if not args.skip_model_run_history:
+        source_relation = args.feature_table or args.source_relation
+        save_model_run_to_snowflake(
+            metrics=metrics,
+            feature_importance=feature_importance,
+            drift_report=drift_report,
+            model_path=args.model_path,
+            source_relation=source_relation,
+            settings=settings,
+            table_name=args.model_run_history_table,
+            model_uri=settings.model_uri,
+        )
 
     logger.info("Model accuracy: %.4f", metrics["accuracy"])
     logger.info("Model precision: %.4f", metrics["precision"])

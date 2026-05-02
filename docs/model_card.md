@@ -93,6 +93,14 @@ ml/artifacts/model_drift_report.json
 
 The drift report compares the latest run with the previous run and flags metric drops or major top-feature shifts. These artifacts are displayed in the Streamlit model performance tab so reviewers can see whether the model is improving, stable, or needs attention.
 
+Production training runs are also persisted to Snowflake:
+
+```text
+CUSTOMER_INTELLIGENCE.ML_ARTIFACTS.MODEL_TRAINING_RUNS
+```
+
+The Snowflake history table captures the run ID, timestamp, selected model, artifact path or URI, source relation, core metrics, top feature, full metrics payload, feature importance, model comparison, and drift report for auditability.
+
 ## Model Comparison
 
 | Model | Accuracy | Balanced Accuracy | Precision | Recall | F1 | ROC AUC | Threshold |
@@ -127,5 +135,5 @@ This is useful for campaigns where false positives are costly. If the business g
 - Add richer customer features such as recency bands, reorder streaks, and category preferences.
 - Add product and department affinity features once basket item coverage is improved.
 - Add SHAP or permutation importance for more transparent explanations.
-- Store model versions, evaluation history, and drift reports in Snowflake, S3, or a model registry.
+- Add model version promotion metadata on top of the Snowflake run history.
 - Tune thresholds by campaign objective: retention, replenishment, win-back, or product discovery.

@@ -18,9 +18,9 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     try:
-        load_model(settings.model_path)
+        load_model(settings.model_path, settings.model_uri, settings)
     except FileNotFoundError:
-        logger.warning("Model artifact is not available yet: %s", settings.model_path)
+        logger.warning("Model artifact is not available yet: %s", settings.model_uri or settings.model_path)
     except Exception:
         logger.exception("Failed to load model artifact")
         raise
