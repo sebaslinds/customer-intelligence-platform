@@ -419,6 +419,7 @@ MODEL_PATH=ml/artifacts/random_forest_reorder_model.joblib
 MODEL_URI=
 MODEL_CACHE_DIR=
 MODEL_RUN_HISTORY_TABLE=CUSTOMER_INTELLIGENCE.ML_ARTIFACTS.MODEL_TRAINING_RUNS
+MODEL_DRIFT_SUMMARY_VIEW=CUSTOMER_INTELLIGENCE.ML_ARTIFACTS.MODEL_DRIFT_SUMMARY
 API_BASE_URL=http://localhost:8000
 API_AUTH_ENABLED=false
 API_KEY=
@@ -436,6 +437,8 @@ not configured, the API uses the local in-memory limiter for development and sin
 Set `MODEL_URI` to a Snowflake stage file path when the API should download the model artifact
 at startup instead of reading the local `MODEL_PATH` file.
 The training pipeline writes every model run to `MODEL_RUN_HISTORY_TABLE` for production auditability.
+It also creates `MODEL_DRIFT_SUMMARY_VIEW`, which exposes the latest drift status and metric deltas
+for the dashboard.
 
 ## Running Locally
 
@@ -473,6 +476,9 @@ Snowflake history table, use:
 ```bash
 python -m ml.train_model --skip-model-run-history
 ```
+
+The dashboard reads model history from Snowflake first, using `MODEL_TRAINING_RUNS` and
+`MODEL_DRIFT_SUMMARY`, then falls back to the committed local artifacts if Snowflake is unavailable.
 
 Run the API:
 
@@ -526,7 +532,9 @@ When writing model run history from training, grant table privileges to the trai
 
 ```sql
 GRANT CREATE TABLE ON SCHEMA CUSTOMER_INTELLIGENCE.ML_ARTIFACTS TO ROLE TRANSFORMER;
+GRANT CREATE VIEW ON SCHEMA CUSTOMER_INTELLIGENCE.ML_ARTIFACTS TO ROLE TRANSFORMER;
 GRANT INSERT, SELECT ON FUTURE TABLES IN SCHEMA CUSTOMER_INTELLIGENCE.ML_ARTIFACTS TO ROLE TRANSFORMER;
+GRANT SELECT ON FUTURE VIEWS IN SCHEMA CUSTOMER_INTELLIGENCE.ML_ARTIFACTS TO ROLE TRANSFORMER;
 ```
 
 ### Streamlit Cloud
@@ -577,14 +585,14 @@ Workflow file:
 - Airflow and Kafka are included as production-style scaffolding, not hosted services in the current deployment.
 - The API can load the model artifact from a Snowflake stage with `MODEL_URI`; the committed artifact remains a local development fallback.
 - Training runs are persisted to `MODEL_RUN_HISTORY_TABLE` with metrics, drift findings, feature importance, and model comparison payloads.
+- `MODEL_DRIFT_SUMMARY_VIEW` exposes the latest drift status and metric deltas for production monitoring.
 - AI responses are grounded in aggregate Snowflake metrics and do not have unrestricted SQL execution.
 
 ## Future Improvements
 
 - Add model artifact versioning and promotion metadata
-- Surface Snowflake model run history directly in the dashboard
+- Add alert routing when `MODEL_DRIFT_SUMMARY` reports attention status
 - Tune Redis-backed rate limit thresholds by endpoint and environment
-- Add model drift monitoring
 - Add SHAP or permutation importance for clearer model explanations
 - Persist Decision Engine outputs to Snowflake for auditability
 - Add Slack or email alert routing from the Decision Engine

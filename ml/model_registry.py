@@ -164,6 +164,66 @@ def _create_history_table(cursor: Any, table_name: str) -> None:
     )
 
 
+def _create_drift_summary_view(cursor: Any, table_name: str, view_name: str) -> None:
+    cursor.execute(
+        f"""
+        create or replace view {view_name} as
+        with ranked_runs as (
+            select
+                *,
+                row_number() over (order by run_timestamp desc) as recency_rank,
+                count(*) over () as run_count,
+                lag(run_id) over (order by run_timestamp) as previous_run_id,
+                lag(run_timestamp) over (order by run_timestamp) as previous_run_timestamp,
+                lag(roc_auc) over (order by run_timestamp) as previous_roc_auc,
+                lag(balanced_accuracy) over (order by run_timestamp) as previous_balanced_accuracy,
+                lag(brier_score) over (order by run_timestamp) as previous_brier_score,
+                lag(top_feature) over (order by run_timestamp) as previous_top_feature,
+                lag(top_feature_importance) over (order by run_timestamp) as previous_top_feature_importance
+            from {table_name}
+        )
+        select
+            run_count,
+            run_id as current_run_id,
+            run_timestamp as current_run_timestamp,
+            previous_run_id,
+            previous_run_timestamp,
+            selected_model,
+            model_selection_metric,
+            source_relation,
+            model_artifact_uri,
+            coalesce(
+                drift_report:status::string,
+                iff(run_count <= 1, 'baseline', 'stable')
+            ) as drift_status,
+            coalesce(
+                drift_report:summary::string,
+                'No drift report saved for the latest run.'
+            ) as drift_summary,
+            to_json(drift_report:findings) as drift_findings_json,
+            roc_auc,
+            previous_roc_auc,
+            roc_auc - previous_roc_auc as roc_auc_delta,
+            balanced_accuracy,
+            previous_balanced_accuracy,
+            balanced_accuracy - previous_balanced_accuracy as balanced_accuracy_delta,
+            brier_score,
+            previous_brier_score,
+            brier_score - previous_brier_score as brier_score_delta,
+            precision,
+            recall,
+            f1,
+            top_feature,
+            previous_top_feature,
+            top_feature_importance,
+            previous_top_feature_importance,
+            top_feature_importance - previous_top_feature_importance as top_feature_importance_delta
+        from ranked_runs
+        where recency_rank = 1
+        """
+    )
+
+
 def _insert_history_record(cursor: Any, table_name: str, record: dict[str, Any]) -> None:
     columns = ", ".join(MODEL_RUN_HISTORY_COLUMNS)
     placeholders = ", ".join(["%s"] * len(MODEL_RUN_HISTORY_COLUMNS))
@@ -210,6 +270,7 @@ def save_model_run_to_snowflake(
     resolved_table_name = normalize_snowflake_table_identifier(
         table_name or settings.model_run_history_table
     )
+    drift_summary_view = normalize_snowflake_table_identifier(settings.model_drift_summary_view)
     record = build_model_run_record(
         metrics=metrics,
         feature_importance=feature_importance,
@@ -223,6 +284,7 @@ def save_model_run_to_snowflake(
     try:
         with connection.cursor() as cursor:
             _create_history_table(cursor, resolved_table_name)
+            _create_drift_summary_view(cursor, resolved_table_name, drift_summary_view)
             _insert_history_record(cursor, resolved_table_name, record)
     finally:
         connection.close()

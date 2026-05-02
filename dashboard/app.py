@@ -19,6 +19,7 @@ from config.logging_config import configure_logging  # noqa: E402
 from config.production import validate_production_settings  # noqa: E402
 from config.settings import get_settings  # noqa: E402
 from ingestion.snowflake_client import build_snowflake_engine  # noqa: E402
+from ml.model_registry import normalize_snowflake_table_identifier  # noqa: E402
 
 settings = get_settings()
 validate_production_settings(settings)
@@ -1209,8 +1210,56 @@ def load_feature_importance() -> pd.DataFrame:
     return pd.read_csv(FEATURE_IMPORTANCE_PATH)
 
 
-@st.cache_data(show_spinner=False)
-def load_model_history() -> pd.DataFrame:
+def _value_or_none(value: Any) -> Any:
+    if value is None:
+        return None
+    try:
+        if pd.isna(value):
+            return None
+    except (TypeError, ValueError):
+        return value
+    return value
+
+
+def _parse_json_value(value: Any, default: Any) -> Any:
+    if value is None:
+        return default
+    if isinstance(value, list | dict):
+        return value
+    if not isinstance(value, str) or not value.strip():
+        return default
+    try:
+        return json.loads(value)
+    except json.JSONDecodeError:
+        return default
+
+
+def load_model_history_from_snowflake() -> pd.DataFrame:
+    table_name = normalize_snowflake_table_identifier(settings.model_run_history_table)
+    query = f"""
+        select
+            run_timestamp,
+            selected_model,
+            train_rows,
+            test_rows,
+            threshold,
+            accuracy,
+            balanced_accuracy,
+            precision,
+            recall,
+            f1,
+            roc_auc,
+            average_precision,
+            brier_score,
+            top_feature,
+            top_feature_importance
+        from {table_name}
+        order by run_timestamp
+    """
+    return query_snowflake(query)
+
+
+def load_model_history_from_file() -> pd.DataFrame:
     if not MODEL_HISTORY_PATH.exists():
         return pd.DataFrame()
 
@@ -1221,12 +1270,63 @@ def load_model_history() -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner=False)
-def load_model_drift_report() -> dict[str, Any]:
+def load_model_history() -> pd.DataFrame:
+    try:
+        history = load_model_history_from_snowflake()
+        if not history.empty:
+            return history
+    except Exception:
+        logger.exception("Failed to load model history from Snowflake; falling back to local artifact")
+
+    return load_model_history_from_file()
+
+
+def load_model_drift_report_from_snowflake() -> dict[str, Any]:
+    view_name = normalize_snowflake_table_identifier(settings.model_drift_summary_view)
+    frame = query_snowflake(f"select * from {view_name}")
+    if frame.empty:
+        return {}
+
+    row = frame.iloc[0].to_dict()
+    tracked_metrics = {}
+    for metric_name in ["roc_auc", "balanced_accuracy", "brier_score"]:
+        tracked_metrics[metric_name] = {
+            "previous": _value_or_none(row.get(f"previous_{metric_name}")),
+            "current": _value_or_none(row.get(metric_name)),
+            "delta": _value_or_none(row.get(f"{metric_name}_delta")),
+        }
+
+    return {
+        "status": row.get("drift_status"),
+        "summary": row.get("drift_summary"),
+        "current_run_timestamp": _value_or_none(row.get("current_run_timestamp")),
+        "previous_run_timestamp": _value_or_none(row.get("previous_run_timestamp")),
+        "selected_model": row.get("selected_model"),
+        "findings": _parse_json_value(row.get("drift_findings_json"), []),
+        "tracked_metrics": tracked_metrics,
+        "top_feature": row.get("top_feature"),
+        "top_feature_importance": _value_or_none(row.get("top_feature_importance")),
+    }
+
+
+def load_model_drift_report_from_file() -> dict[str, Any]:
     if not MODEL_DRIFT_PATH.exists():
         return {}
 
     with MODEL_DRIFT_PATH.open("r", encoding="utf-8") as file:
         return json.load(file)
+
+
+@st.cache_data(show_spinner=False)
+def load_model_drift_report() -> dict[str, Any]:
+    try:
+        drift_report = load_model_drift_report_from_snowflake()
+        if drift_report:
+            return drift_report
+    except Exception:
+        logger.exception("Failed to load model drift summary from Snowflake; falling back to local artifact")
+
+    return load_model_drift_report_from_file()
 
 
 def read_streamlit_secret(name: str) -> str | None:

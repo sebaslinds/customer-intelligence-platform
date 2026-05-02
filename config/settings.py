@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     model_uri: str | None = None
     model_cache_dir: str | None = None
     model_run_history_table: str = "CUSTOMER_INTELLIGENCE.ML_ARTIFACTS.MODEL_TRAINING_RUNS"
+    model_drift_summary_view: str = "CUSTOMER_INTELLIGENCE.ML_ARTIFACTS.MODEL_DRIFT_SUMMARY"
     openai_api_key: str | None = None
     openai_model: str = "gpt-4.1-mini"
     gemini_api_key: str | None = None

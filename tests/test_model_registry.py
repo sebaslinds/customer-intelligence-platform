@@ -109,5 +109,6 @@ def test_save_model_run_to_snowflake_creates_table_and_inserts(monkeypatch) -> N
 
     assert record["source_relation"] == "fct_orders"
     assert any("create table if not exists CUSTOMER_INTELLIGENCE.ML_ARTIFACTS.MODEL_TRAINING_RUNS" in sql for sql in executed_sql)
+    assert any("create or replace view CUSTOMER_INTELLIGENCE.ML_ARTIFACTS.MODEL_DRIFT_SUMMARY" in sql for sql in executed_sql)
     assert any("insert into CUSTOMER_INTELLIGENCE.ML_ARTIFACTS.MODEL_TRAINING_RUNS" in sql for sql in executed_sql)
     assert len(executed_params[0]) == 25

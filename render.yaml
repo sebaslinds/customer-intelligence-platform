@@ -16,6 +16,8 @@ services:
         sync: false
       - key: MODEL_RUN_HISTORY_TABLE
         value: CUSTOMER_INTELLIGENCE.ML_ARTIFACTS.MODEL_TRAINING_RUNS
+      - key: MODEL_DRIFT_SUMMARY_VIEW
+        value: CUSTOMER_INTELLIGENCE.ML_ARTIFACTS.MODEL_DRIFT_SUMMARY
       - key: OPENAI_MODEL
         value: gpt-4.1-mini
       - key: SNOWFLAKE_ACCOUNT

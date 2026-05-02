@@ -49,6 +49,7 @@ dbt Mart Models
 | Machine learning | scikit-learn model comparison | Compares Gradient Boosting, Random Forest, and Logistic Regression for reorder prediction. |
 | Model artifacts | Snowflake internal stage with local fallback | Stores production model artifacts outside Git while preserving a local development artifact path. |
 | Model run history | Snowflake `MODEL_TRAINING_RUNS` table | Persists model metrics, feature importance, model comparison, and drift reports for auditability. |
+| Model drift monitoring | Snowflake `MODEL_DRIFT_SUMMARY` view | Exposes latest drift status, metric deltas, and top-feature movement to the dashboard. |
 | API | FastAPI on Render | Serves health checks, prediction scoring, decision engine outputs, and AI copilot insights. |
 | Rate limiting | Redis with local fallback | Shares API rate limit counters across production instances and keeps in-memory limits for local development. |
 | Dashboard | Streamlit Cloud | Displays KPIs, product trends, customer insights, data quality, pipeline health, ML performance, decisions, and copilot responses. |
@@ -62,7 +63,7 @@ dbt Mart Models
 3. Raw records are loaded into Snowflake analytics tables.
 4. dbt creates clean staging models for orders, order products, and products.
 5. dbt marts create facts, dimensions, customer cohorts, churn probabilities, lifetime value, and a feature store.
-6. The ML training pipeline reads Snowflake features, compares candidate models, and writes model artifacts, evaluation metrics, and Snowflake run history.
+6. The ML training pipeline reads Snowflake features, compares candidate models, and writes model artifacts, evaluation metrics, Snowflake run history, and a drift summary view.
 7. FastAPI loads the selected model and exposes `/predict`, `/decision`, and `/copilot/insights`.
 8. Streamlit reads Snowflake marts and calls the deployed API.
 9. The AI copilot and Decision Engine collect metric context, use configured LLM providers when available, and fall back to deterministic explanations when providers are unavailable.
@@ -88,6 +89,7 @@ GitHub
   |      +--> FastAPI service
   |      +--> Model artifact downloaded from Snowflake stage
   |      +--> Model training history table
+  |      +--> Model drift summary view
   |      +--> Snowflake + OpenAI/Gemini + Redis environment variables
   |      +--> Redis-backed rate limiting
   |
@@ -105,5 +107,6 @@ GitHub
 - `REDIS_URL` enables shared API rate limiting in production; local development falls back to in-memory counters.
 - `MODEL_URI` lets the API download the model artifact from a Snowflake internal stage during startup.
 - `MODEL_RUN_HISTORY_TABLE` stores production training metrics and drift payloads in Snowflake.
+- `MODEL_DRIFT_SUMMARY_VIEW` gives the dashboard a production drift status with latest-versus-previous deltas.
 - The dashboard includes local fallback logic for AI copilot resilience.
 - The committed model artifact remains a development fallback for local runs without Snowflake access.
